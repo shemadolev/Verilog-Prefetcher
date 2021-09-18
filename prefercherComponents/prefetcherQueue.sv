@@ -41,7 +41,8 @@ logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr;
 logic validReq;
 logic addrHit;
 logic addrIdx;
-// queue alive blocks - mask for the blocks within the range (headPtr,tailPtr)
+logic isEmpty;
+// queue alive blocks - mask for the blocks within the range [addrIdx,tailPtr-1]
 logic [0:QUEUE_SIZE-1] queueMask;
 //watchdog
 logic watchdogHit;
@@ -74,9 +75,8 @@ always_comb begin
     valid = validVec[addrIdx] & addrHit; 
     dataValid = dataValidVec[addrIdx];
     //indicates that the queue is full
-    isFull = ((tailPtr + 1'b1) == headPtr); //dolev ben shel 
-    isEmpty =
-    //isFull = ((tailPtr + 1'b1) == headPtr);
+    isFull = (tailPtr == headPtr) && !isEmpty;
+    isEmpty = ~|validVec;
 end
 
 always_ff @(posedge clk or negedge resetN)
@@ -86,6 +86,8 @@ begin
         dataValidVec <= QUEUE_SIZE'b0;
         outstandingReqVec <= QUEUE_SIZE'b0;
         ToCounterVec <= QUEUE_SIZE'b0;
+        headPtr <= 1'b0;
+        tailPtr <= 1'b0;
 	end
 	    
     else begin
@@ -117,10 +119,10 @@ begin
         // writeReq
         else if(inOpcode==2'd2) begin
             if(!isFull) begin
-                validVec[tailPtr+1] <= 1'b1;
-                dataValidVec[tailPtr+1] <= 1'b0;
-                outstandingReqVec[tailPtr+1] <= 1'b1;
-                blockAddrMat[tailPtr+1] <= inAddr;
+                validVec[tailPtr] <= 1'b1;
+                dataValidVec[tailPtr] <= 1'b0;
+                outstandingReqVec[tailPtr] <= 1'b1;
+                blockAddrMat[tailPtr] <= inAddr;
                 tailPtr <= tailPtr + 1;
                 // watchdog logic
                 ToCounterVec[addrIdx] <= 1'b0;
