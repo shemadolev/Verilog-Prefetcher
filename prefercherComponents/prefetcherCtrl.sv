@@ -11,12 +11,13 @@ module prefetcherCtrl(
     input logic     [0:ADDR_BITS-1] limit,
     input logic     addrReqHit, //data path output logic valid
     input logic     almostFull,
+    input logic     outstandingReqCnt,
+    input logic     outstandingReqLimit,
 
     output logic    rangeHit, //indicates that the request is the prefetcher range
     output logic    prefetchedAddrValid,
     output logic    [0:ADDR_BITS-1] prefetchedAddr,
     output logic    flushN //control bit to flush the queue
-    //TODO add almost max outstanding requests
 );
 
 parameter ADDR_BITS = 64; //64bit address 2^64
@@ -26,7 +27,9 @@ logic   [0:ADDR_BITS-1] currentStride;
 logic   [0:ADDR_BITS-1] storedStride;
 logic   [0:ADDR_BITS-1] nxtStride;
 logic   [0:ADDR_BITS-1] lastAddr;
+logic   [0:ADDR_BITS-1] nxtPrefetchedAddr,
 logic   strideHit, trigger, nxtFlushN;
+logic   strideHit, trigger, nxtFlushN, nxtPrefetchedAddrValid, addrStrideAheadInRange;
 
 //FSM States
 enum logic [1:0] {s_idle=2'b00, s_arm=2'b01, s_active=2'b10} curState, nxtState;
@@ -37,6 +40,7 @@ always_ff (posedge clk or negedge resetN) begin
         storedStride <= (ADDR_BITS)'d0;
         lastAddr <= (ADDR_BITS)'d0;
         flushN <= 1'b1;
+        prefetchedAddrValid <= 1'b0;
 	end
 	else begin
         if(en) begin
@@ -44,6 +48,8 @@ always_ff (posedge clk or negedge resetN) begin
             lastAddr <= inAddrReq;
             storedStride <= nxtStride;
             flushN <= nxtFlushN;
+            prefetchedAddrValid <= nxtPrefetchedAddrValid;
+            prefetchedAddr <= nxtPrefetchedAddr;
         end
     end
 end
@@ -53,30 +59,38 @@ always_comb begin
     nxtState = curState;
     nxtStride = storedStride;
     nxtFlushN = 1'b1;
+    nxtPrefetchedAddrValid = 1'b0;
+    nxtPrefetchedAddr = prefetchedAddr;
 
-    case curState:
-        s_idle: begin
-            if(trigger) begin
-                nxtState = s_arm;
+    if(rangeHit) begin //Update state only for relevant addresses
+        case curState:
+            s_idle: begin
+                if(trigger) begin
+                    nxtState = s_arm;
+                end
             end
-        end
-        s_arm: begin
-            if((currentStride != (ADDR_BITS)'d0) && inAddrReqValid) begin
-                nxtState = s_active;
-                nxtStride = currentStride;
+            s_arm: begin
+                if((currentStride != (ADDR_BITS)'d0) && inAddrReqValid) begin
+                    nxtState = s_active;
+                    nxtStride = currentStride;
+                end
             end
-        end
-        s_active: begin
-            if(strideHit || currentStride==(ADDR_BITS)'d0) begin
-                nxtState = s_active;
+            s_active: begin
+                if(strideHit || currentStride==(ADDR_BITS)'d0) begin
+                    nxtState = s_active;
+                        //Should fetch next block
+                        ...
+                end
+                else begin
+                    nxtState = s_arm;
+                    nxtFlushN = 1'b0;
+                end
             end
-            else begin 
-                nxtState = s_arm;
-                nxtFlushN = 1'b0;
-            end
-        end
-    endcase
+        endcase
+    end
 end
+
+//TODO Address calcs should drop the block bits
 
 // signals assignment
 assign rangeHit = (inAddrReq >= bar) && (inAddrReq <= limit)
