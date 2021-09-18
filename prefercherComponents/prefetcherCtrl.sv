@@ -28,7 +28,7 @@ logic   [0:ADDR_BITS-1] storedStride;
 logic   [0:ADDR_BITS-1] nxtStride;
 logic   [0:ADDR_BITS-1] lastAddr;
 logic   [0:ADDR_BITS-1] nxtPrefetchedAddr,
-logic   strideHit, trigger, nxtFlushN;
+logic   [0:ADDR_BITS-1] addrStrideAhead,
 logic   strideHit, trigger, nxtFlushN, nxtPrefetchedAddrValid, addrStrideAheadInRange;
 
 //FSM States
@@ -78,8 +78,10 @@ always_comb begin
             s_active: begin
                 if(strideHit || currentStride==(ADDR_BITS)'d0) begin
                     nxtState = s_active;
+                    if((outstandingReqCnt < outstandingReqLimit) && !almostFull && addrStrideAheadInRange) begin
                         //Should fetch next block
                         ...
+                    end
                 end
                 else begin
                     nxtState = s_arm;
@@ -93,7 +95,9 @@ end
 //TODO Address calcs should drop the block bits
 
 // signals assignment
-assign rangeHit = (inAddrReq >= bar) && (inAddrReq <= limit)
+assign rangeHit = (inAddrReq >= bar) && (inAddrReq <= limit);
+assign addrStrideAhead = prefetchedAddr + storedStride;
+assign addrStrideAheadInRange = (addrStrideAhead >= bar) && (addrStrideAhead <= limit);
 assign currentStride = inAddrReq - lastAddr; //TODO: Check if handles correctly negative strides
 assign trigger = inAddrReq != (ADDR_BITS-1)'d0; //first valid address
 assign strideHit = (storedStride == currentStride) && inAddrReqValid;
