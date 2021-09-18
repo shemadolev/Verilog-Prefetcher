@@ -29,7 +29,7 @@ logic   [0:ADDR_BITS-1] nxtStride;
 logic   [0:ADDR_BITS-1] lastAddr;
 logic   [0:ADDR_BITS-1] nxtPrefetchedAddr,
 logic   [0:ADDR_BITS-1] addrStrideAhead,
-logic   strideHit, trigger, nxtFlushN, nxtPrefetchedAddrValid, addrStrideAheadInRange;
+logic   strideHit, nxtFlushN, nxtPrefetchedAddrValid, addrStrideAheadInRange;
 
 //FSM States
 enum logic [1:0] {s_idle=2'b00, s_arm=2'b01, s_active=2'b10} curState, nxtState;
@@ -65,7 +65,7 @@ always_comb begin
     if(rangeHit) begin //Update state only for relevant addresses
         case curState:
             s_idle: begin
-                if(trigger) begin
+                if(inAddrReqValid) begin
                     nxtState = s_arm;
                 end
             end
@@ -99,7 +99,6 @@ assign rangeHit = (inAddrReq >= bar) && (inAddrReq <= limit);
 assign addrStrideAhead = prefetchedAddr + storedStride;
 assign addrStrideAheadInRange = (addrStrideAhead >= bar) && (addrStrideAhead <= limit);
 assign currentStride = inAddrReq - lastAddr; //TODO: Check if handles correctly negative strides
-assign trigger = inAddrReq != (ADDR_BITS-1)'d0; //first valid address
 assign strideHit = (storedStride == currentStride) && inAddrReqValid;
 
 endmodule
