@@ -12,15 +12,15 @@ input logic     [0:BA_ADDR_SIZE-1] inAddr,
 input logic	    [0:(1<<LOG_BLOCK_DATA_BYTES)-1] inData,
 input logic     [0:1] inOpcode
 input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
-	
+input logic     [0:LOG_QUEUE_SIZE-1] almostFullSpacer, 
+
 //local
 output logic	[0:(1<<LOG_BLOCK_DATA_BYTES)-1] dataOut,
 output logic    valid, // if valid==1'b1 & dataValid==1'b0  ==>> outstanding request
 output logic    dataValid, 
 //global
 output logic	[0:LOG_QUEUE_SIZE] outstandingReqCnt,
-output logic	isFull, //If queue is full (=all valid bits are on), don't get extra requests.
-// TODO change to almost full
+output logic	almostFull, //If queue is {almostFullSpacer} blocks from being full
 );
 
 parameter LOG_QUEUE_SIZE = 3'd6; // the size of the queue [2^x] 
@@ -41,7 +41,7 @@ logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr;
 logic validReq;
 logic addrHit;
 logic addrIdx;
-logic isEmpty;
+logic isEmpty, isFull;
 // queue alive blocks - mask for the blocks within the range [addrIdx,tailPtr-1]
 logic [0:QUEUE_SIZE-1] queueMask;
 //watchdog
@@ -74,9 +74,9 @@ always_comb begin
     // on addr miss valid==1'b0, top level flushes the queue
     valid = validVec[addrIdx] & addrHit; 
     dataValid = dataValidVec[addrIdx];
-    //indicates that the queue is full
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
+    almostFull = (tailPtr + almostFullSpacer >= headPtr) && !isEmpty;
 end
 
 always_ff @(posedge clk or negedge resetN)
