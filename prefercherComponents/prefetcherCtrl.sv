@@ -62,34 +62,34 @@ always_comb begin
     nxtPrefetchedAddrValid = 1'b0;
     nxtPrefetchedAddr = prefetchedAddr;
 
-    if(rangeHit) begin //Update state only for relevant addresses
-        case curState:
-            s_idle: begin
-                if(inAddrReqValid) begin
-                    nxtState = s_arm;
-                end
+    case curState:
+        s_idle: begin
+            if(rangeHit && inAddrReqValid) begin
+                nxtState = s_arm;
+                nxtPrefetchedAddrValid = 1'b1;
+                nxtPrefetchedAddr = inAddrReq;
             end
-            s_arm: begin
-                if((currentStride != (ADDR_BITS)'d0) && inAddrReqValid) begin
-                    nxtState = s_active;
-                    nxtStride = currentStride;
-                end
+        end
+        s_arm: begin
+            if((currentStride != (ADDR_BITS)'d0) && rangeHit && inAddrReqValid) begin
+                nxtState = s_active;
+                nxtStride = currentStride;
+                nxtPrefetchedAddrValid = 1'b1;
+                nxtPrefetchedAddr = inAddrReq;
             end
-            s_active: begin
-                if(strideHit || currentStride==(ADDR_BITS)'d0) begin
-                    nxtState = s_active;
-                    if((outstandingReqCnt < outstandingReqLimit) && !almostFull && addrStrideAheadInRange) begin
-                        //Should fetch next block
-                        ...
-                    end
-                end
-                else begin
-                    nxtState = s_arm;
-                    nxtFlushN = 1'b0;
-                end
+        end
+        s_active: begin
+            if (!strideHit && (currentStride != (ADDR_BITS)'d0) && rangeHit && inAddrReqValid) begin
+                nxtState = s_arm;
+                nxtFlushN = 1'b0;
             end
-        endcase
-    end
+            else if((outstandingReqCnt < outstandingReqLimit) && !almostFull && addrStrideAheadInRange) begin
+                //Should fetch next block
+                nxtPrefetchedAddrValid = 1'b1;
+                nxtPrefetchedAddr = addrStrideAhead;
+            end
+        end
+    endcase
 end
 
 //TODO Address calcs should drop the block bits
