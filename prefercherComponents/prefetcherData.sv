@@ -5,7 +5,7 @@
                     0- invalidate, 1-read, 2- writeReq, 3-writeResp
                 * A watchdog mechanism that evicts old and unused blocks. 
  */
-module	prefetcherQueue	(
+module	prefetcherData	(
 input logic	    clk,
 input logic     resetN,
 input logic     [0:BA_ADDR_SIZE-1] inAddr,
@@ -76,7 +76,7 @@ always_comb begin
     dataValid = dataValidVec[addrIdx];
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
-    almostFull = (tailPtr + almostFullSpacer >= headPtr) && !isEmpty;
+    almostFull = (tailPtr + almostFullSpacer >= headPtr) && !isEmpty; //fixme 
 end
 
 always_ff @(posedge clk or negedge resetN)
