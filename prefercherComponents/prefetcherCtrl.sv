@@ -5,8 +5,7 @@ module prefetcherCtrl(
     input logic     clk,
     input logic     en,
     input logic     resetN,
-    input logic     inAddrReqValid, //valid only on read req (given by the top) write reqs aren't relevant for this module
-    input logic     [0:ADDR_BITS-1] inAddrReq,
+    
     input logic     [0:ADDR_BITS-1] bar,
     input logic     [0:ADDR_BITS-1] limit,
     input logic     addrReqHit, //data path output logic valid
@@ -15,9 +14,16 @@ module prefetcherCtrl(
     input logic     outstandingReqLimit,
 
     output logic    rangeHit, //indicates that the request is the prefetcher range
+    output logic    flushN, //control bit to flush the queue
+    
+    //AXI slave port
+    input logic     inAddrReqValid, //valid only on read req (given by the top) write reqs aren't relevant for this module
+    input logic     [0:ADDR_BITS-1] inAddrReq,
+    output logic    inAddrReqReady, //todo
+    //AXI master port
     output logic    prefetchedAddrValid,
     output logic    [0:ADDR_BITS-1] prefetchedAddr,
-    output logic    flushN //control bit to flush the queue
+    input  logic    prefetchedAddrReady
 );
 
 parameter ADDR_BITS = 64; //64bit address 2^64
@@ -59,40 +65,46 @@ always_comb begin
     nxtState = curState;
     nxtStride = storedStride;
     nxtFlushN = 1'b1;
-    nxtPrefetchedAddrValid = 1'b0;
+    nxtPrefetchedAddrValid = prefetchedAddrValid;
     nxtPrefetchedAddr = prefetchedAddr;
 
-    case curState:
-        s_idle: begin
-            if(rangeHit && inAddrReqValid) begin
-                nxtState = s_arm;
-                nxtPrefetchedAddrValid = 1'b1;
-                nxtPrefetchedAddr = inAddrReq;
-            end
+    if(prefetchedAddrValid == 1'b1) begin //wait for ready from the slave
+        if(prefetchedAddrReady) begin
+            nxtPrefetchedAddrValid = 1'b0;
         end
-        s_arm: begin
-            if((currentStride != (ADDR_BITS)'d0) && rangeHit && inAddrReqValid) begin
-                nxtState = s_active;
-                nxtStride = currentStride;
-                nxtPrefetchedAddrValid = 1'b1;
-                nxtPrefetchedAddr = inAddrReq;
+    end
+    else begin
+        case curState:
+            s_idle: begin
+                if(rangeHit && inAddrReqValid) begin
+                    nxtState = s_arm;
+                    nxtPrefetchedAddrValid = 1'b1;
+                    nxtPrefetchedAddr = inAddrReq;
+                end
             end
-        end
-        s_active: begin
-            if (!strideHit && (currentStride != (ADDR_BITS)'d0) && rangeHit && inAddrReqValid) begin
-                nxtState = s_arm;
-                nxtFlushN = 1'b0;
-                nxtPrefetchedAddrValid = 1'b1;
-                nxtPrefetchedAddr = inAddrReq;
+            s_arm: begin
+                if((currentStride != (ADDR_BITS)'d0) && rangeHit && inAddrReqValid) begin
+                    nxtState = s_active;
+                    nxtStride = currentStride;
+                    nxtPrefetchedAddrValid = 1'b1;
+                    nxtPrefetchedAddr = inAddrReq;
+                end
             end
-            else if((outstandingReqCnt < outstandingReqLimit) && !almostFull && addrStrideAheadInRange) begin
-                //Should fetch next block
-                //TODO Shoud check if DDR / arbiter is ready + keep the same address until arbiter / DDR handled the previous read
-                nxtPrefetchedAddrValid = 1'b1;
-                nxtPrefetchedAddr = addrStrideAhead;
+            s_active: begin
+                if (!strideHit && (currentStride != (ADDR_BITS)'d0) && rangeHit && inAddrReqValid) begin
+                    nxtState = s_arm;
+                    nxtFlushN = 1'b0;
+                    nxtPrefetchedAddrValid = 1'b1;
+                    nxtPrefetchedAddr = inAddrReq;
+                end
+                else if((outstandingReqCnt < outstandingReqLimit) && !almostFull && addrStrideAheadInRange) begin
+                    //Should fetch next block
+                    nxtPrefetchedAddrValid = 1'b1;
+                    nxtPrefetchedAddr = addrStrideAhead;
+                end
             end
-        end
-    endcase
+        endcase
+    end
 end
 
 //TODO Address calcs should drop the block bits

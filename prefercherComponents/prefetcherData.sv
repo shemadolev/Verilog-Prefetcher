@@ -2,7 +2,7 @@
  * Description: prefetchQueue is the base module (queue) of a prefetcher. main capabilities:
  *              * Stores outstanding requests and data responses from DRAM
  *              * Supports 4 opreations, for each block in the queue, according to 4 opcodes: 
-                    0- invalidate, 1-read, 2- writeReq, 3-writeResp
+                    0- invalidate, 1-read, 2- writeReq (AXI AR/Read Request), 3-writeResp (AXI R/Read Data)
                 * A watchdog mechanism that evicts old and unused blocks. 
  */
 module	prefetcherData	(
