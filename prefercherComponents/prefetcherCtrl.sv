@@ -82,9 +82,12 @@ always_comb begin
             if (!strideHit && (currentStride != (ADDR_BITS)'d0) && rangeHit && inAddrReqValid) begin
                 nxtState = s_arm;
                 nxtFlushN = 1'b0;
+                nxtPrefetchedAddrValid = 1'b1;
+                nxtPrefetchedAddr = inAddrReq;
             end
             else if((outstandingReqCnt < outstandingReqLimit) && !almostFull && addrStrideAheadInRange) begin
                 //Should fetch next block
+                //TODO Shoud check if DDR / arbiter is ready + keep the same address until arbiter / DDR handled the previous read
                 nxtPrefetchedAddrValid = 1'b1;
                 nxtPrefetchedAddr = addrStrideAhead;
             end
