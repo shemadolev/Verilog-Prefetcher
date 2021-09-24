@@ -84,10 +84,10 @@ end
 always_ff @(posedge clk or negedge resetN)
 begin
 	if(!resetN)	begin 
-        validVec <= QUEUE_SIZE'b0;
-        dataValidVec <= QUEUE_SIZE'b0;
-        outstandingReqVec <= QUEUE_SIZE'b0;
-        ToCounterVec <= QUEUE_SIZE'b0;
+        validVec <= {QUEUE_SIZE{1'b0}};
+        dataValidVec <= {QUEUE_SIZE{1'b0}};
+        outstandingReqVec <= {QUEUE_SIZE{1'b0}};
+        ToCounterVec <= {QUEUE_SIZE{1'b0}};
         headPtr <= 1'b0;
         tailPtr <= 1'b0;
 	end

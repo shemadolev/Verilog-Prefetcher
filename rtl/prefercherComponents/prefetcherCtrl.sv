@@ -35,7 +35,7 @@ logic   [0:ADDR_BITS-1] nxtStride;
 logic   [0:ADDR_BITS-1] lastAddr;
 logic   [0:ADDR_BITS-1] nxtmasterAddr,
 logic   [0:ADDR_BITS-1] prefetchAddr,
-logic   reqValid, strideMiss, nxtFlushN, nxtMasterValid, nxtSlaveReady, prefetchAddrInRange;
+logic   reqValid, strideMiss, nxtFlushN, nxtMasterValid, nxtSlaveReady, prefetchAddrInRange, zeroStride;
 
 //FSM States
 enum logic [1:0] {s_idle=2'b00, s_arm=2'b01, s_active=2'b10} curState, nxtState;
@@ -43,8 +43,8 @@ enum logic [1:0] {s_idle=2'b00, s_arm=2'b01, s_active=2'b10} curState, nxtState;
 always_ff (posedge clk or negedge resetN) begin
 	if(!resetN)	begin
 		curState <= s_idle;
-        storedStride <= (ADDR_BITS)'d0;
-        lastAddr <= (ADDR_BITS)'d0;
+        storedStride <= {ADDR_BITS{1'b0}};
+        lastAddr <= {ADDR_BITS{1'b0}};
         flushN <= 1'b1;
         masterValid <= 1'b0;
 	end
@@ -80,7 +80,7 @@ always_comb begin
                 end
             end
             s_arm: begin
-                if(reqValid && (currentStride != (ADDR_BITS)'d0)) begin
+                if(reqValid && !zeroStride) begin
                     nxtState = s_active;
                     nxtStride = currentStride;
                     nxtMasterValid = 1'b1;
@@ -116,10 +116,11 @@ end
 //TODO is the controller the only one that access the datapath
 
 // signals assignment
+assign currentStride = slaveAddr - lastAddr; //TODO: Check if handles correctly negative strides
+assign zeroStride = (currentStride == {ADDR_BITS{1'b0}});
 assign rangeHit = (slaveAddr >= bar) && (slaveAddr <= limit);
 assign reqValid = rangeHit && slaveValid; // the request in the slave port is valid
 assign prefetchAddr = masterAddr + storedStride;
 assign prefetchAddrInRange = (prefetchAddr >= bar) && (prefetchAddr <= limit);
-assign currentStride = slaveAddr - lastAddr; //TODO: Check if handles correctly negative strides
-assign strideMiss = (storedStride != currentStride) && currentStride != (ADDR_BITS)'d0;
+assign strideMiss = (storedStride != currentStride) && !zeroStride;
 endmodule
