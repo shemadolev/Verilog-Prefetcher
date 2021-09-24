@@ -76,8 +76,10 @@ always_comb begin
     dataValid = dataValidVec[addrIdx];
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
-    almostFull = (tailPtr + almostFullSpacer >= headPtr) && !isEmpty; //fixme 
+    almostFull = (tailPtr + almostFullSpacer >= headPtr) && !isEmpty; //FIXME 
 end
+
+//TODO add AXI response implementation
 
 always_ff @(posedge clk or negedge resetN)
 begin

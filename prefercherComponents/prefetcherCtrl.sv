@@ -8,7 +8,7 @@ module prefetcherCtrl(
 
     input logic     [0:ADDR_BITS-1] bar,
     input logic     [0:ADDR_BITS-1] limit,
-    input logic     addrReqHit, //data path output logic valid
+    input logic     prefetcherHit, //data path output logic valid
     input logic     almostFull,
     input logic     outstandingReqCnt,
     input logic     outstandingReqLimit,
@@ -34,8 +34,8 @@ logic   [0:ADDR_BITS-1] storedStride;
 logic   [0:ADDR_BITS-1] nxtStride;
 logic   [0:ADDR_BITS-1] lastAddr;
 logic   [0:ADDR_BITS-1] nxtmasterAddr,
-logic   [0:ADDR_BITS-1] addrStrideAhead,
-logic   strideHit, nxtFlushN, nxtmasterValid, addrStrideAheadInRange;
+logic   [0:ADDR_BITS-1] prefetchAddr,
+logic   reqValid, strideMiss, nxtFlushN, nxtMasterValid, nxtSlaveReady, prefetchAddrInRange;
 
 //FSM States
 enum logic [1:0] {s_idle=2'b00, s_arm=2'b01, s_active=2'b10} curState, nxtState;
@@ -54,7 +54,7 @@ always_ff (posedge clk or negedge resetN) begin
             lastAddr <= slaveAddr;
             storedStride <= nxtStride;
             flushN <= nxtFlushN;
-            masterValid <= nxtmasterValid;
+            masterValid <= nxtMasterValid;
             masterAddr <= nxtmasterAddr;
         end
     end
@@ -65,54 +65,61 @@ always_comb begin
     nxtState = curState;
     nxtStride = storedStride;
     nxtFlushN = 1'b1;
-    nxtmasterValid = masterValid;
+    nxtMasterValid = masterValid;
     nxtmasterAddr = masterAddr;
+    nxtSlaveReady = 1'b0;
 
-    if(masterValid == 1'b1) begin //wait for ready from the slave
-        if(masterReady) begin
-            nxtmasterValid = 1'b0;
-        end
-    end
-    else begin
+    if(masterValid == 1'b0) begin
         case curState:
             s_idle: begin
-                if(rangeHit && slaveValid) begin
+                if(reqValid) begin
                     nxtState = s_arm;
-                    nxtmasterValid = 1'b1;
+                    nxtMasterValid = 1'b1;
+                    nxtSlaveReady = 1'b1;
                     nxtmasterAddr = slaveAddr;
                 end
             end
             s_arm: begin
-                if((currentStride != (ADDR_BITS)'d0) && rangeHit && slaveValid) begin
+                if(reqValid && (currentStride != (ADDR_BITS)'d0)) begin
                     nxtState = s_active;
                     nxtStride = currentStride;
-                    nxtmasterValid = 1'b1;
+                    nxtMasterValid = 1'b1;
+                    nxtSlaveReady = 1'b1;
                     nxtmasterAddr = slaveAddr;
                 end
-            end
+            end 
             s_active: begin
-                if (!strideHit && (currentStride != (ADDR_BITS)'d0) && rangeHit && slaveValid) begin
+                if (reqValid && (strideMiss || !prefetcherHit)) begin
                     nxtState = s_arm;
                     nxtFlushN = 1'b0;
-                    nxtmasterValid = 1'b1;
+                    nxtMasterValid = 1'b1;
+                    nxtSlaveReady = 1'b1;
                     nxtmasterAddr = slaveAddr;
                 end
-                else if((outstandingReqCnt < outstandingReqLimit) && !almostFull && addrStrideAheadInRange) begin
+                else if((outstandingReqCnt < outstandingReqLimit) && !almostFull && prefetchAddrInRange) begin
                     //Should fetch next block
-                    nxtmasterValid = 1'b1;
-                    nxtmasterAddr = addrStrideAhead;
+                    nxtMasterValid = 1'b1;
+                    nxtmasterAddr = prefetchAddr;
                 end
             end
         endcase
     end
+
+    else if(masterReady) begin //wait for ready from the slave
+            nxtMasterValid = 1'b0; // TODO: optimization - don't waste a cycle between requests 
+        end
+    end
 end
+
 //TODO handle miss in prefercherData->flushN => s_idle
 //TODO Address calcs should drop the block bits
+//TODO is the controller the only one that access the datapath
 
 // signals assignment
 assign rangeHit = (slaveAddr >= bar) && (slaveAddr <= limit);
-assign addrStrideAhead = masterAddr + storedStride;
-assign addrStrideAheadInRange = (addrStrideAhead >= bar) && (addrStrideAhead <= limit);
+assign reqValid = rangeHit && slaveValid; // the request in the slave port is valid
+assign prefetchAddr = masterAddr + storedStride;
+assign prefetchAddrInRange = (prefetchAddr >= bar) && (prefetchAddr <= limit);
 assign currentStride = slaveAddr - lastAddr; //TODO: Check if handles correctly negative strides
-assign strideHit = (storedStride == currentStride) && slaveValid;
+assign strideMiss = (storedStride != currentStride) && currentStride != (ADDR_BITS)'d0;
 endmodule
