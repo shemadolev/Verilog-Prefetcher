@@ -4,7 +4,7 @@
 
 
 module	doubleQueue	(
-	clk,        //<i
+	clk,        //<i 
 	resetN,     //<i
 	pushEn,     //<i
 	inVector,   //<i
