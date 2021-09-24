@@ -1,10 +1,10 @@
-module onesCnt(
+module onesCnt#(
+    parameter LOG_VEC_SIZE = 4,
+    parameter VEC_SIZE = 1<<LOG_VEC_SIZE
+)(
     input logic [0:VEC_SIZE-1] A,
     output logic [0:LOG_VEC_SIZE] ones
     );
-
-parameter LOG_VEC_SIZE;
-parameter VEC_SIZE = 1<<LOG_VEC_SIZE; 
 
 integer i;
 

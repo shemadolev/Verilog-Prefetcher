@@ -1,7 +1,9 @@
 //Notes: On flush, reset the stride FSM; If stride changes, do nothing (if we'll get hit in MOQ, blocks will pop out, else timeout will expire)
 
-module prefetcherCtrl(
-    
+module prefetcherCtrl #(
+    parameter ADDR_BITS = 64, //64bit address 2^64
+    parameter LOG_OUTSTAND_REQS = 3'd6 //64bit address 2^64
+)(
     input logic     clk,
     input logic     en,
     input logic     resetN,
@@ -25,9 +27,6 @@ module prefetcherCtrl(
     output logic    [0:ADDR_BITS-1] masterAddr,
     input  logic    masterReady
 );
-
-parameter ADDR_BITS = 64; //64bit address 2^64
-parameter LOG_OUTSTAND_REQS = 3'd6; //64bit address 2^64
 
 logic   [0:ADDR_BITS-1] currentStride;
 logic   [0:ADDR_BITS-1] storedStride;

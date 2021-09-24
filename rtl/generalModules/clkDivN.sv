@@ -1,6 +1,6 @@
-// add description
-
-module  clkDivN (  
+module  clkDivN #(
+	parameter WIDTH = 10'd10
+)(  
     ////////////////////  Clock Input     ////////////////////  
     input     logic  clk,
     input     logic  resetN,
@@ -11,14 +11,12 @@ module  clkDivN (
 
 );
 
-parameter WIDTH = 10'd10;
-
 logic [0:WIDTH-1] counter;
 
 always_ff@(posedge clk or negedge resetN)
 begin
     if(!resetN) begin
-        counter  <= WIDTH'b0;
+      counter  <= {WIDTH{1'b0}};
         slowEnPulse      <= 1'b0;
         slowEnPulse_d    <= 1'b0;
     end
@@ -26,7 +24,7 @@ begin
     begin
         slowEnPulse_d  <=  slowEnPulse; // 1 clk delay
         if (counter >= preScaleValue) begin
-            counter        <= WIDTH'b0;
+            counter        <= {WIDTH{1'b0}};
             slowEnPulse    <= 1'b1;
         end
         else begin

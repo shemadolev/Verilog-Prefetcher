@@ -5,28 +5,29 @@
                     0- invalidate, 1-read, 2- writeReq (AXI AR/Read Request), 3-writeResp (AXI R/Read Data)
                 * A watchdog mechanism that evicts old and unused blocks. 
  */
-module	prefetcherData	(
-input logic	    clk,
-input logic     resetN,
-input logic     [0:BA_ADDR_SIZE-1] inAddr,
-input logic	    [0:(1<<LOG_BLOCK_DATA_BYTES)-1] inData,
-input logic     [0:1] inOpcode
-input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
-input logic     [0:LOG_QUEUE_SIZE-1] almostFullSpacer, 
+module	prefetcherData #(
+    parameter LOG_QUEUE_SIZE = 3'd6; // the size of the queue [2^x] 
+    parameter LOG_BLOCK_DATA_BYTES = 3'd6; //[Bytes]
+    parameter BA_ADDR_SIZE = 7'd64; // the size of the address [bits]
+    parameter WATCHDOG_SIZE = 10'd10; // number of bits for the watchdog counter
+)(
+    input logic	    clk,
+    input logic     resetN,
+    input logic     [0:BA_ADDR_SIZE-1] inAddr,
+    input logic	    [0:(1<<LOG_BLOCK_DATA_BYTES)-1] inData,
+    input logic     [0:1] inOpcode
+    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
+    input logic     [0:LOG_QUEUE_SIZE-1] almostFullSpacer, 
 
-//local
-output logic	[0:(1<<LOG_BLOCK_DATA_BYTES)-1] dataOut,
-output logic    valid, // if valid==1'b1 & dataValid==1'b0  ==>> outstanding request
-output logic    dataValid, 
-//global
-output logic	[0:LOG_QUEUE_SIZE] outstandingReqCnt,
-output logic	almostFull, //If queue is {almostFullSpacer} blocks from being full
+    //local
+    output logic	[0:(1<<LOG_BLOCK_DATA_BYTES)-1] dataOut,
+    output logic    valid, // if valid==1'b1 & dataValid==1'b0  ==>> outstanding request
+    output logic    dataValid, 
+    //global
+    output logic	[0:LOG_QUEUE_SIZE] outstandingReqCnt,
+    output logic	almostFull, //If queue is {almostFullSpacer} blocks from being full
 );
 
-parameter LOG_QUEUE_SIZE = 3'd6; // the size of the queue [2^x] 
-parameter LOG_BLOCK_DATA_BYTES = 3'd6; //[Bytes]
-parameter BA_ADDR_SIZE = 7'd64; // the size of the address [bits]
-parameter WATCHDOG_SIZE = 10'd10; // number of bits for the watchdog counter
 
 localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE;
 localparam BLOCK_SIZE = 1<<LOG_BLOCK_DATA_BYTES;
