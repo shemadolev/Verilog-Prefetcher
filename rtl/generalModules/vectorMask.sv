@@ -4,27 +4,34 @@
 
 module vectorMask #(
     parameter LOG_WIDTH = 3'd6,
-    parameter WIDTH = 1<<LOG_WIDTH;
+    parameter WIDTH = 1<<LOG_WIDTH
 ) (
-    input logic [0:LOG_WIDTH-1] headIdx,
-    input logic [0:LOG_WIDTH-1] tailIdx,
-    output logic [0:WIDTH-1] outMask
+    input logic [LOG_WIDTH-1:0] headIdx,
+    input logic [LOG_WIDTH-1:0] tailIdx,
+    output logic [WIDTH-1:0] outMask
 );
 
-parameter logic [2*WIDTH-1:0] maskTemplate = {{WIDTH{1'b0}},{(WIDTH-1){1'b1}}}; //WIDTH=3: 00011
+  parameter logic [2*WIDTH-1:0] maskTemplate = {{(WIDTH-1){1'b1}},{WIDTH{1'b0}}}; //WIDTH=3: 00011
 
-logic [0:WIDTH-1] headMaskVec;
-logic [0:WIDTH-1] tailMaskVec;
-logic [0:WIDTH-1] maskVec;
-logic tailIsLeading;
+    logic [WIDTH-1:0] headMaskVec;
+    logic [WIDTH-1:0] tailMaskVec;
+    logic [WIDTH-1:0] maskVec;
+    logic tailIsLeading;
 
-always_comb begin
-    headMaskVec = maskTemplate[headIdx:(headIdx+WIDTH-1)]; // 0: 000, 1: 001, 2: 011
-    tailMaskVec = maskTemplate[tailIdx:(tailIdx+WIDTH-1)];
-    maskVec = headMaskVec ^ tailMaskVec;
-end
+    logic [WIDTH-1:0] maskTemplateArr [WIDTH-1:0];
 
-assign tailIsLeading = headIdx < tailIdx;
-assign outMask = tailIsLeading ? maskVec : ~maskVec
+    generate genvar i;
+        for(i=0; i<WIDTH; i=i+1)
+            assign maskTemplateArr[i] = maskTemplate[(i+WIDTH-1):i];
+    endgenerate
+
+    always_comb begin
+        headMaskVec = maskTemplateArr[headIdx]; // 0: 000, 1: 001, 2: 011
+        tailMaskVec = maskTemplateArr[tailIdx];
+        maskVec = headMaskVec ^ tailMaskVec;
+    end
+
+    assign tailIsLeading = headIdx < tailIdx;
+    assign outMask = tailIsLeading ? maskVec : ~maskVec;
 
 endmodule

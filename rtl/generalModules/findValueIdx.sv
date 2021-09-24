@@ -5,27 +5,26 @@ module findValueIdx #(
 
 )(
     input logic     [0:TAG_SIZE-1] inTag,
-    input logic     [0:TAG_SIZE-1] valid,
+    input logic     [0:VEC_SIZE-1] valid,
     input logic     [0:TAG_SIZE-1] inMat [0:VEC_SIZE-1],
     
-    output logic    [OUT_WIDTH-1:0] matchIdx,
+    output logic    [LOG_VEC_SIZE-1:0] matchIdx,
     output logic    hit
 );
 
+    logic [VEC_SIZE-1:0] compareVec;
+    wire [LOG_VEC_SIZE:0] highbitRes;
 
-logic [0:VEC_SIZE-1] compareVec;
-wire [0:LOG_VEC_SIZE] highbitRes;
+    generate genvar i;
+        for(i=0; i<VEC_SIZE; i=i+1)
+            assign compareVec[i] = (inTag==inMat[i]) & valid[i] ; 
+    endgenerate
 
-generate genvar i;
-    for(i=0; i<VEC_SIZE; i=i+1)
-        assign compareVec[i] = (inTag==inMat[i]) & valid[i] ; 
-endgenerate
-
-highbit #(.OUT_WIDTH(LOG_VEC_SIZE+1)) findIdx 
+    highbit #(.OUT_WIDTH(LOG_VEC_SIZE+1)) findIdx 
             (.in(compareVec), .out(highbitRes)
             );
 
-assign hit = ~highbitRes[LOG_VEC_SIZE];
-assign matchIdx = highbitRes[0:LOG_VEC_SIZE-1];
+    assign hit = ~highbitRes[LOG_VEC_SIZE];
+    assign matchIdx = highbitRes[LOG_VEC_SIZE-1:0];
 
 endmodule
