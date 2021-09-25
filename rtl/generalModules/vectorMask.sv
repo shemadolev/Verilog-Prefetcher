@@ -11,7 +11,7 @@ module vectorMask #(
     output logic [WIDTH-1:0] outMask
 );
 
-  parameter logic [2*WIDTH-1:0] maskTemplate = {{(WIDTH-1){1'b1}},{WIDTH{1'b0}}}; //WIDTH=3: 00011
+  parameter logic [2*WIDTH-1:0] maskTemplate = {{(WIDTH-1){1'b1}},{WIDTH{1'b0}}}; //WIDTH=3: 11000
 
     logic [WIDTH-1:0] headMaskVec;
     logic [WIDTH-1:0] tailMaskVec;
@@ -26,7 +26,7 @@ module vectorMask #(
     endgenerate
 
     always_comb begin
-        headMaskVec = maskTemplateArr[headIdx]; // 0: 000, 1: 001, 2: 011
+        headMaskVec = maskTemplateArr[headIdx]; // 0: 000, 1: 100, 2: 110
         tailMaskVec = maskTemplateArr[tailIdx];
         maskVec = headMaskVec ^ tailMaskVec;
     end
