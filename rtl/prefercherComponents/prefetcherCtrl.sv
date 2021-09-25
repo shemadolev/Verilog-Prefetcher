@@ -2,7 +2,8 @@
 
 module prefetcherCtrl #(
     parameter ADDR_BITS = 64, //64bit address 2^64
-    parameter LOG_OUTSTAND_REQS = 3'd6 //64bit address 2^64
+    parameter LOG_OUTSTAND_REQS = 3'd6, //64bit address 2^64
+    parameter WATCHDOG_SIZE = 10'd10 // number of bits for the watchdog counter
 )(
     input logic     clk,
     input logic     en,
@@ -14,16 +15,17 @@ module prefetcherCtrl #(
     input logic     almostFull,
     input logic     outstandingReqCnt,
     input logic     outstandingReqLimit,
+    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
 
     output logic    rangeHit, //indicates that the request is the prefetcher range
     output logic    flushN, //control bit to flush the queue
     
     //AXI slave port
     input logic     slaveValid, //valid only on read req (given by the top) write reqs aren't relevant for this module
-    input logic     [0:ADDR_BITS-1] slaveAddr,
+    input logic     [0:ADDR_BITS-1] slaveAddr,//todo separate AW & AR axi signals
     output logic    slaveReady, //TODO  
     //AXI master port
-    output logic    masterValid,
+    output logic    masterValid, //todo separate AW & AR axi signals
     output logic    [0:ADDR_BITS-1] masterAddr,
     input  logic    masterReady
 );
@@ -34,21 +36,37 @@ logic   [0:ADDR_BITS-1] nxtStride;
 logic   [0:ADDR_BITS-1] lastAddr;
 logic   [0:ADDR_BITS-1] nxtmasterAddr,
 logic   [0:ADDR_BITS-1] prefetchAddr,
-logic   reqValid, strideMiss, nxtFlushN, nxtMasterValid, nxtSlaveReady, prefetchAddrInRange, zeroStride;
+logic   reqValid, strideMiss, nxtFlushN, nxtMasterValid, nxtSlaveReady, prefetchAddrInRange, zeroStride, ToBit;
+//watchdog
+logic watchdogHit;
+logic watchdogHit_d;
+
+
+
+// Watchdog
+clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
+            (.clk(clk), .resetN(resetN), .preScaleValue(watchdogCnt)
+             .slowEnPulse(watchdogHit), .slowEnPulse_d(watchdogHit_d)
+            );
 
 //FSM States
 enum logic [1:0] {s_idle=2'b00, s_arm=2'b01, s_active=2'b10} curState, nxtState;
 
 always_ff (posedge clk or negedge resetN) begin
-	if(!resetN)	begin
+	if(!resetN || (watchdogHit && !watchdogHit_d && ToBit==1'b1))	begin
 		curState <= s_idle;
         storedStride <= {ADDR_BITS{1'b0}};
         lastAddr <= {ADDR_BITS{1'b0}};
-        flushN <= 1'b1;
+        flushN <= 1'b0;
         masterValid <= 1'b0;
+        ToBit <= 1'b0;
 	end
 	else begin
         if(en) begin
+            if (watchdogHit && !watchdogHit_d) begin
+                // watchdog description: ToBit += 1 every watchdog rise. Resets on any read request / response. When reaches max value, flush all.
+                ToBit <= ~ToBit;
+            end
             curState <= nxtState;
             lastAddr <= slaveAddr;
             storedStride <= nxtStride;
@@ -105,7 +123,7 @@ always_comb begin
     end
 
     else if(masterReady) begin //wait for ready from the slave
-            nxtMasterValid = 1'b0; // TODO: optimization - don't waste a cycle between requests 
+            nxtMasterValid = 1'b0; //Notice: Waiting this cycle is crucial for the prefetchData to get requests after flush
         end
     end
 end
