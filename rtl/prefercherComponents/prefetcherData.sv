@@ -39,8 +39,9 @@ logic [0:BLOCK_DATA_SIZE_BITS-1] dataMat [0:QUEUE_SIZE-1];
 logic [0:QUEUE_SIZE-1] validVec, dataValidVec, outstandingReqVec;
 logic [0:ADDR_BITS-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block aligned
 //queue helpers
-logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, validCnt;
-logic reqDataValid, addrHit, addrIdx, isEmpty, isFull;
+logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, addrIdx;
+logic [0:LOG_QUEUE_SIZE] validCnt;
+logic reqDataValid, addrHit, isEmpty, isFull;
 
 //find the valid address index
 findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(ADDR_BITS)) findAddrIdx 
