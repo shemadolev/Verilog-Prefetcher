@@ -93,8 +93,8 @@ begin
         // readReq
             // Pop head if data is in headPtr+1. Signal if data in head (or head+1) is valid (respValid). 
         if((reqOpcode==3'd2)) begin
-            if(reqDataValid && (addrIdx == headPtr + 1'b1)) begin
-                //Pop
+            if(addrHit && (addrIdx == headPtr + 1'b1)) begin
+                //Pop (even if data is invalid)
                 validVec[headPtr] = 1'b0;
                 headPtr = headPtr + 1'b1;
             end
@@ -108,7 +108,7 @@ begin
         // writeReq
         else if(reqOpcode==3'd3) begin
             if(addrHit) begin
-                errorCode <= 2'd1;
+                outstandingReqVec[addrIdx] <= 1'b1;
             end
             else if(!isFull) begin
                 validVec[tailPtr] <= 1'b1;
@@ -116,7 +116,8 @@ begin
                 outstandingReqVec[tailPtr] <= 1'b1;
                 blockAddrMat[tailPtr] <= reqAddr;
                 tailPtr <= tailPtr + 1;
-            end else begin //Queue full!
+            end else begin 
+                //Queue full!
                 errorCode <= 2'd2;
             end
         end
