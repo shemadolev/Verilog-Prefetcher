@@ -1,55 +1,50 @@
 /* Module name: prefetcherQueue
  * Description: prefetchQueue is the base module (queue) of a prefetcher. main capabilities:
  *              * Stores outstanding requests and data responses from DRAM
- *              * Supports 4 opreations, for each block in the queue, according to 4 opcodes: 
-                    0- invalidate, 1-read, 2- writeReq (AXI AR/Read Request), 3-writeResp (AXI R/Read Data)
-                * A watchdog mechanism that evicts old and unused blocks. 
+ *              * Supports 4 opreations, for each block in the queue, according to 5 opcodes: 
+                    0 - NOP 1- invalidate, 2-read, 3- writeReq (AXI AR/Read Request), 4-writeResp (AXI R/Read Data)
+                * errorCode:
+                    0 - no error, 1 - WriteReq for existing Addr, 2 - WriteReq to full queue
  */
 module	prefetcherData #(
-    parameter LOG_QUEUE_SIZE = 3'd6; // the size of the queue [2^x] 
-    localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE;
-    parameter LOG_BLOCK_DATA_BYTES = 3'd6; //[Bytes]
-    localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3; //shift left by 3 to convert Bytes->bits
-    parameter BA_ADDR_SIZE = 7'd64; // the size of the address [bits]
-    parameter WATCHDOG_SIZE = 10'd10; // number of bits for the watchdog counter
+    parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
+    localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE,
+    parameter LOG_BLOCK_DATA_BYTES = 3'd6, //[Bytes]
+    localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3, //shift left by 3 to convert Bytes->bits
+    parameter ADDR_BITS = 7'd64 // the size of the address [bits]
 )(
     input logic	    clk,
     input logic     resetN,
-    input logic     [0:BA_ADDR_SIZE-1] inAddr,
-    input logic	    [0:BLOCK_DATA_SIZE_BITS-1] inData,
-    input logic     [0:1] inOpcode,
-    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
-    input logic     [0:LOG_QUEUE_SIZE-1] almostFullSpacer, 
+    input logic     [0:ADDR_BITS-1] reqAddr,
+    input logic	    [0:BLOCK_DATA_SIZE_BITS-1] reqData,
+    input logic     [0:2] reqOpcode,
+
+    //CRS
+    input logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer, 
+    //TODO input the actual requested size of block
 
     //local
-    output logic	[0:BLOCK_DATA_SIZE_BITS-1] dataOut,
-    output logic    valid, // if valid==1'b1 & dataValid==1'b0  ==>> outstanding request
-    output logic    dataValid, 
+    output logic    respValid,
+    output logic	[0:BLOCK_DATA_SIZE_BITS-1] respData,
+    
     //global
     output logic	[0:LOG_QUEUE_SIZE] outstandingReqCnt,
-    output logic	almostFull //If queue is {almostFullSpacer} blocks from being full
+    output logic	almostFull, //If queue is {crs_almostFullSpacer} blocks from being full
+    output logic    [0:1] errorCode
 );
 
 //queue data
-logic [0:BLOCK_SIZE-1] dataMat [0:QUEUE_SIZE-1];
+logic [0:BLOCK_DATA_SIZE_BITS-1] dataMat [0:QUEUE_SIZE-1];
 //block metadata
-logic [0:QUEUE_SIZE-1] validVec, dataValidVec, outstandingReqVec, ToCounterVec;
-logic [0:BA_ADDR_SIZE-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block aligned
+logic [0:QUEUE_SIZE-1] validVec, dataValidVec, outstandingReqVec;
+logic [0:ADDR_BITS-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block aligned
 //queue helpers
 logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, validCnt;
-logic validReq;
-logic addrHit;
-logic addrIdx;
-logic isEmpty, isFull;
-// queue alive blocks - mask for the blocks within the range [addrIdx,tailPtr-1]
-logic [0:QUEUE_SIZE-1] queueMask;
-//watchdog
-logic watchdogHit;
-logic watchdogHit_d;
+logic reqDataValid, addrHit, addrIdx, isEmpty, isFull;
 
 //find the valid address index
-findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(BA_ADDR_SIZE)) findAddrIdx 
-                (.inTag(inAddr), .inMat(blockAddrMat), .valid(validVec),
+findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(ADDR_BITS)) findAddrIdx 
+                (.inTag(reqAddr), .inMat(blockAddrMat), .valid(validVec),
                  .hit(addrHit), .matchIdx(addrIdx)
                  );
 
@@ -65,92 +60,72 @@ onesCnt #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE)) numOfValidBlocks
                  .ones(validCnt)
                 );
 
-// queue mask - updates mask according to the new headPtr when reading from MOQ
-vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) queueAliveMask
-                (.headIdx(addrIdx), .tailIdx(tailPtr),
-                 .outMask(queueMask)
-                );
-                
-// Watchdog
-clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
-            (.clk(clk), .resetN(resetN), .preScaleValue(watchdogCnt)
-             .slowEnPulse(watchdogHit), .slowEnPulse_d(watchdogHit_d)
-            );
-
 always_comb begin
-    dataOut = dataMat[addrIdx];
-    // on addr miss valid==1'b0, top level flushes the queue
-    valid = addrHit; 
-    dataValid = dataValidVec[addrIdx];
+    respData = dataMat[addrIdx];
+    reqDataValid = addrHit && dataValidVec[addrIdx];
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
-    almostFull = validCnt + almostFullSpacer >= QUEUE_SIZE;
+    almostFull = validCnt + crs_almostFullSpacer >= QUEUE_SIZE;
 end
-
-//TODO add AXI response implementation
 
 always_ff @(posedge clk or negedge resetN)
 begin
 	if(!resetN)	begin 
         validVec <= {QUEUE_SIZE{1'b0}};
-        dataValidVec <= {QUEUE_SIZE{1'b0}};
+        // dataValidVec <= {QUEUE_SIZE{1'b0}};
         outstandingReqVec <= {QUEUE_SIZE{1'b0}};
-        ToCounterVec <= {QUEUE_SIZE{1'b0}};
         headPtr <= 1'b0;
         tailPtr <= 1'b0;
+        respValid <= 1'b0;
+        errorCode <= 2'b0;
 	end
 	    
     else begin
-        // if in the same clk we also get a request the opcode's action
-            // will overwrite the relevant fields
-        // watchdog description: on each watchdog posedge invalidate blocks where ToCnt==1'b1
-            // and toggle ToCnt
-        if (watchdogHit && !watchdogHit_d) begin
-            ToCounterVec <= ~ToCounterVec;
-            validVec <= validVec & ~ToCounterVec;
-        end
-        
+        errorCode <= 2'd0;
         // invalidateReq
-        if((inOpcode==2'd0)) begin
+        if((reqOpcode==3'd1)) begin
             if (addrHit) begin
                 dataValidVec[addrIdx] <= 1'b0;
             end
         end
 
         // readReq
-            // on address match, update headPtr and invalidate all blocks till MOQ ptr
-        if((inOpcode==2'd1)) begin
-            if (addrHit) begin
-                headPtr <= addrIdx;
-                validVec <= validVec & queueMask;
-                ToCounterVec[addrIdx] <= 1'b0; //TODO ask Freddy if relevant. The rational: keep the block we accessed alive, it won't make bubbles 
+            // Pop head if data is in headPtr+1. Signal if data in head (or head+1) is valid (respValid). 
+        if((reqOpcode==3'd2)) begin
+            if(reqDataValid && (addrIdx == headPtr + 1'b1)) begin
+                //Pop
+                validVec[headPtr] = 1'b0;
+                headPtr = headPtr + 1'b1;
+            end
+            if(reqDataValid && (addrIdx == headPtr)) begin
+                respValid <= 1'b1;
+            end else begin
+                respValid <= 1'b0;
             end
         end
         
         // writeReq
-        else if(inOpcode==2'd2) begin
+        else if(reqOpcode==3'd3) begin
             if(addrHit) begin
-                dataValidVec[addrIdx] <= 1'b0;
-                outstandingReqVec[addrIdx] <= 1'b1;
+                errorCode <= 2'd1;
             end
             else if(!isFull) begin
                 validVec[tailPtr] <= 1'b1;
                 dataValidVec[tailPtr] <= 1'b0;
                 outstandingReqVec[tailPtr] <= 1'b1;
-                blockAddrMat[tailPtr] <= inAddr;
+                blockAddrMat[tailPtr] <= reqAddr;
                 tailPtr <= tailPtr + 1;
-                // watchdog logic
-                ToCounterVec[addrIdx] <= 1'b0;
+            end else begin //Queue full!
+                errorCode <= 2'd2;
             end
         end
 
         // writeResp
-        else if(inOpcode==2'd3) begin
+        else if(reqOpcode==3'd4) begin
             if(addrHit) begin
-                validVec[addrIdx] <= 1'b1;
                 dataValidVec[addrIdx] <= 1'b1;
                 outstandingReqVec[addrIdx] <= 1'b0;
-                dataMat[addrIdx] <= inData;
+                dataMat[addrIdx] <= reqData;
             end
         end 
 	end
