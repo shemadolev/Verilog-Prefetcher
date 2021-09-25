@@ -88,7 +88,7 @@ always_comb begin
                 end
             end 
             s_active: begin
-                if (reqValid && (strideMiss || !prefetcherHit)) begin
+                if (reqValid && (strideMiss || !prefetcherHit)) begin //TODO refer to dataInValid
                     nxtState = s_arm;
                     nxtFlushN = 1'b0;
                     nxtMasterValid = 1'b1;

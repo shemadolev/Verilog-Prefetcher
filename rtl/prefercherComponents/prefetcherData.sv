@@ -7,30 +7,28 @@
  */
 module	prefetcherData #(
     parameter LOG_QUEUE_SIZE = 3'd6; // the size of the queue [2^x] 
+    localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE;
     parameter LOG_BLOCK_DATA_BYTES = 3'd6; //[Bytes]
+    localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3; //shift left by 3 to convert Bytes->bits
     parameter BA_ADDR_SIZE = 7'd64; // the size of the address [bits]
     parameter WATCHDOG_SIZE = 10'd10; // number of bits for the watchdog counter
 )(
     input logic	    clk,
     input logic     resetN,
     input logic     [0:BA_ADDR_SIZE-1] inAddr,
-    input logic	    [0:(1<<LOG_BLOCK_DATA_BYTES)-1] inData,
-    input logic     [0:1] inOpcode
+    input logic	    [0:BLOCK_DATA_SIZE_BITS-1] inData,
+    input logic     [0:1] inOpcode,
     input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
     input logic     [0:LOG_QUEUE_SIZE-1] almostFullSpacer, 
 
     //local
-    output logic	[0:(1<<LOG_BLOCK_DATA_BYTES)-1] dataOut,
+    output logic	[0:BLOCK_DATA_SIZE_BITS-1] dataOut,
     output logic    valid, // if valid==1'b1 & dataValid==1'b0  ==>> outstanding request
     output logic    dataValid, 
     //global
     output logic	[0:LOG_QUEUE_SIZE] outstandingReqCnt,
-    output logic	almostFull, //If queue is {almostFullSpacer} blocks from being full
+    output logic	almostFull //If queue is {almostFullSpacer} blocks from being full
 );
-
-
-localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE;
-localparam BLOCK_SIZE = 1<<LOG_BLOCK_DATA_BYTES;
 
 //queue data
 logic [0:BLOCK_SIZE-1] dataMat [0:QUEUE_SIZE-1];
@@ -54,6 +52,7 @@ findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(BA_ADDR_SIZE)) findAddrI
                 (.inTag(inAddr), .inMat(blockAddrMat), .valid(validVec),
                  .hit(addrHit), .matchIdx(addrIdx)
                  );
+
 //count the number of outstanding requests
 onesCnt #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE)) outstandingReqs 
                 (.A(outstandingReqVec), 
@@ -71,6 +70,7 @@ vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) queueAliveMask
                 (.headIdx(addrIdx), .tailIdx(tailPtr),
                  .outMask(queueMask)
                 );
+                
 // Watchdog
 clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
             (.clk(clk), .resetN(resetN), .preScaleValue(watchdogCnt)
@@ -80,7 +80,7 @@ clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
 always_comb begin
     dataOut = dataMat[addrIdx];
     // on addr miss valid==1'b0, top level flushes the queue
-    valid = validVec[addrIdx] & addrHit; 
+    valid = addrHit; 
     dataValid = dataValidVec[addrIdx];
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
@@ -129,7 +129,11 @@ begin
         
         // writeReq
         else if(inOpcode==2'd2) begin
-            if(!isFull) begin
+            if(addrHit) begin
+                dataValidVec[addrIdx] <= 1'b0;
+                outstandingReqVec[addrIdx] <= 1'b1;
+            end
+            else if(!isFull) begin
                 validVec[tailPtr] <= 1'b1;
                 dataValidVec[tailPtr] <= 1'b0;
                 outstandingReqVec[tailPtr] <= 1'b1;
