@@ -38,7 +38,7 @@ logic [0:BLOCK_SIZE-1] dataMat [0:QUEUE_SIZE-1];
 logic [0:QUEUE_SIZE-1] validVec, dataValidVec, outstandingReqVec, ToCounterVec;
 logic [0:BA_ADDR_SIZE-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block aligned
 //queue helpers
-logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr;
+logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, validCnt;
 logic validReq;
 logic addrHit;
 logic addrIdx;
@@ -59,6 +59,13 @@ onesCnt #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE)) outstandingReqs
                 (.A(outstandingReqVec), 
                  .ones(outstandingReqCnt)
                 );
+
+//count the number of valid blocks
+onesCnt #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE)) numOfValidBlocks 
+                (.A(validVec), 
+                 .ones(validCnt)
+                );
+
 // queue mask - updates mask according to the new headPtr when reading from MOQ
 vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) queueAliveMask
                 (.headIdx(addrIdx), .tailIdx(tailPtr),
@@ -77,7 +84,7 @@ always_comb begin
     dataValid = dataValidVec[addrIdx];
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
-    almostFull = (tailPtr + almostFullSpacer >= headPtr) && !isEmpty; //FIXME 
+    almostFull = validCnt + almostFullSpacer >= QUEUE_SIZE;
 end
 
 //TODO add AXI response implementation
@@ -116,6 +123,7 @@ begin
             if (addrHit) begin
                 headPtr <= addrIdx;
                 validVec <= validVec & queueMask;
+                ToCounterVec[addrIdx] <= 1'b0; //TODO ask Freddy if relevant. The rational: keep the block we accessed alive, it won't make bubbles 
             end
         end
         
@@ -139,8 +147,6 @@ begin
                 dataValidVec[addrIdx] <= 1'b1;
                 outstandingReqVec[addrIdx] <= 1'b0;
                 dataMat[addrIdx] <= inData;
-                // watchdog logic
-                ToCounterVec[addrIdx] <= 1'b0; 
             end
         end 
 	end
