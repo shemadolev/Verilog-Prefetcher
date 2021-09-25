@@ -68,7 +68,7 @@ always_ff (posedge clk or negedge resetN) begin
                 ToBit <= ~ToBit;
             end
             curState <= nxtState;
-            lastAddr <= slaveAddr;
+            lastAddr <= slaveAddr;//fixme
             storedStride <= nxtStride;
             flushN <= nxtFlushN;
             masterValid <= nxtMasterValid;
