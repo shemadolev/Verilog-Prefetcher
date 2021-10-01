@@ -2,7 +2,7 @@
  * Description: prefetchQueue is the base module (queue) of a prefetcher. main capabilities:
  *              * Stores outstanding requests and data responses from DRAM
  *              * Supports 4 opreations, for each block in the queue, according to 5 opcodes: 
-                    0 - NOP 1- invalidate, 2-read, 3- writeReq (AXI AR/Read Request), 4-writeResp (AXI R/Read Data)
+                    0 - NOP ,1 - readReqPref,  2 - readReqSlave(AXI AR/Read Request), 3 - readDataMaster(AXI R/Read Data), 4 - readDataPromise
                 * errorCode:
                     0 - no error, 1 - WriteReq for existing Addr, 2 - WriteReq to full queue
  */
@@ -11,7 +11,8 @@ module	prefetcherData #(
     localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE,
     parameter LOG_BLOCK_DATA_BYTES = 3'd6, //[Bytes]
     localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3, //shift left by 3 to convert Bytes->bits
-    parameter ADDR_BITS = 7'd64 // the size of the address [bits]
+    parameter ADDR_BITS = 7'd64, // the size of the address [bits]
+    parameter PROMISE_WIDTH = 3'd3 // the log size of the promise's counter
 )(
     input logic	    clk,
     input logic     resetN,
@@ -37,11 +38,12 @@ module	prefetcherData #(
 logic [0:BLOCK_DATA_SIZE_BITS-1] dataMat [0:QUEUE_SIZE-1];
 //block metadata
 logic [0:QUEUE_SIZE-1] validVec, dataValidVec, outstandingReqVec;
+logic [0:PROMISE_WIDTH-1] promiseCnt [0:QUEUE_SIZE-1];
 logic [0:ADDR_BITS-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block aligned
 //queue helpers
 logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, addrIdx;
 logic [0:LOG_QUEUE_SIZE] validCnt;
-logic reqDataValid, addrHit, isEmpty, isFull;
+logic addrHit, isEmpty, isFull;
 
 //find the valid address index
 findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(ADDR_BITS)) findAddrIdx 
@@ -63,7 +65,6 @@ onesCnt #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE)) numOfValidBlocks
 
 always_comb begin
     respData = dataMat[addrIdx];
-    reqDataValid = addrHit && dataValidVec[addrIdx];
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
     almostFull = validCnt + crs_almostFullSpacer >= QUEUE_SIZE;
@@ -71,6 +72,7 @@ end
 
 always_ff @(posedge clk or negedge resetN)
 begin
+    // TODO update the miss machine according to the new opcodes
 	if(!resetN)	begin 
         validVec <= {QUEUE_SIZE{1'b0}};
         // dataValidVec <= {QUEUE_SIZE{1'b0}};
@@ -83,37 +85,52 @@ begin
 	    
     else begin
         errorCode <= 2'd0;
-        // invalidateReq
-        if((reqOpcode==3'd1)) begin
-            if (addrHit) begin
-                dataValidVec[addrIdx] <= 1'b0;
-            end
-        end
 
         // readReq
             // Pop head if data is in headPtr+1. Signal if data in head (or head+1) is valid (respValid). 
-        if((reqOpcode==3'd2)) begin
+        if((reqOpcode==3'd1)) begin
             if(addrHit && (addrIdx == headPtr + 1'b1)) begin
                 //Pop (even if data is invalid)
                 validVec[headPtr] = 1'b0;
                 headPtr = headPtr + 1'b1;
             end
+            if(addrHit && addrIdx == headPtr) begin
+                if(dataValidVec[addrIdx])
+                    respValid <= 1'b1;
+                else begin
+                    respValid <= 1'b0;
+                    promiseCnt[addrIdx] = promiseCnt[addrIdx]+1;    
+                end           
+            end
+            
             if(reqDataValid && (addrIdx == headPtr)) begin
-                respValid <= 1'b1;
             end else begin
                 respValid <= 1'b0;
             end
         end
         
-        // writeReq
-        else if(reqOpcode==3'd3) begin
-            if(addrHit) begin
-                outstandingReqVec[addrIdx] <= 1'b1;
-            end
-            else if(!isFull) begin
+        // writeReqPref (requests which were initiated by transactions from the prefetching mechanism)
+        else if(reqOpcode==3'd2) begin
+            if(!isFull) begin
                 validVec[tailPtr] <= 1'b1;
                 dataValidVec[tailPtr] <= 1'b0;
                 outstandingReqVec[tailPtr] <= 1'b1;
+                promiseCnt[addrIdx] <= (PROMISE_WIDTH-1)'d0;
+                blockAddrMat[tailPtr] <= reqAddr;
+                tailPtr <= tailPtr + 1;
+            end else begin 
+                //Queue full!
+                errorCode <= 2'd2;
+            end
+        end
+
+        // writeReqSlave (requests which were initiated by transactions from the slave port)
+        else if(reqOpcode==3'd3) begin
+            if(!isFull) begin
+                validVec[tailPtr] <= 1'b1;
+                dataValidVec[tailPtr] <= 1'b0;
+                outstandingReqVec[tailPtr] <= 1'b1;
+                promiseCnt[addrIdx] <= (PROMISE_WIDTH-1)'d1;
                 blockAddrMat[tailPtr] <= reqAddr;
                 tailPtr <= tailPtr + 1;
             end else begin 
