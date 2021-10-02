@@ -2,9 +2,9 @@
  * Description: prefetchQueue is the base module (queue) of a prefetcher. main capabilities:
  *              * Stores outstanding requests and data responses from DRAM
  *              * Supports 4 opreations, for each block in the queue, according to 5 opcodes: 
-                    0 - NOP ,1 - readReqPref,  2 - readReqSlave(AXI AR/Read Request), 3 - readDataMaster(AXI R/Read Data), 4 - readDataPromise
+                    0 - NOP ,1 - readReqPref,  2 - readReqMaster(AXI AR/Read Request), 3 - readDataSlave(AXI R/Read Data), 4 - readDataPromise
                 * errorCode:
-                    0 - no error, 1 - WriteReq for existing Addr, 2 - WriteReq to full queue
+                    0 - no error, 1 - Invalid opcode, 2 - WriteReq to full queue, 3 - Requesting data read when not ready
  */
 module	prefetcherData #(
     parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
@@ -27,8 +27,10 @@ module	prefetcherData #(
     //local
     output logic    respValid,
     output logic	[0:BLOCK_DATA_SIZE_BITS-1] respData,
+    output logic	[0:ADDR_BITS-1] respAddr,
     
     //global
+    output logic	dataReady,
     output logic	[0:LOG_QUEUE_SIZE] outstandingReqCnt,
     output logic	almostFull, //If queue is {crs_almostFullSpacer} blocks from being full
     output logic    [0:1] errorCode
@@ -43,7 +45,7 @@ logic [0:ADDR_BITS-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block 
 //queue helpers
 logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, addrIdx;
 logic [0:LOG_QUEUE_SIZE] validCnt;
-logic addrHit, isEmpty, isFull;
+logic addrHit, isEmpty, isFull, dataReady_head, dataReady_nxtHead;
 
 //find the valid address index
 findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(ADDR_BITS)) findAddrIdx 
@@ -64,11 +66,17 @@ onesCnt #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE)) numOfValidBlocks
                 );
 
 always_comb begin
-    respData = dataMat[addrIdx];
+    respData = dataMat[headPtr];
+    respAddr = blockAddrMat[headPtr];
     isFull = (tailPtr == headPtr) && !isEmpty;
     isEmpty = ~|validVec;
     almostFull = validCnt + crs_almostFullSpacer >= QUEUE_SIZE;
+    dataReady_head = (validVec[headPtr] && dataValidVec[headPtr] == 1'b1 && promiseCnt[headPtr] > {(PROMISE_WIDTH){1'b0}});
+    dataReady_nxtHead = (validVec[headPtr + 1] && dataValidVec[headPtr + 1] == 1'b1 && promiseCnt[headPtr + 1] > {(PROMISE_WIDTH){1'b0}});
+    dataReady = dataReady_head || ((promiseCnt[headPtr] == {(PROMISE_WIDTH){1'b0}}) && dataReady_nxtHead);
 end
+
+// 0 - NOP ,1 - readReqPref,  2 - readReqMaster(AXI AR/Read Request), 3 - readDataSlave(AXI R/Read Data), 4 - readDataPromise
 
 always_ff @(posedge clk or negedge resetN)
 begin
@@ -85,37 +93,34 @@ begin
 	    
     else begin
         errorCode <= 2'd0;
+        respValid <= 1'b0;
 
-        // readReq
-            // Pop head if data is in headPtr+1. Signal if data in head (or head+1) is valid (respValid). 
-        if((reqOpcode==3'd1)) begin
-            if(addrHit && (addrIdx == headPtr + 1'b1)) begin
-                //Pop (even if data is invalid)
-                validVec[headPtr] = 1'b0;
-                headPtr = headPtr + 1'b1;
-            end
-            if(addrHit && addrIdx == headPtr) begin
-                if(dataValidVec[addrIdx])
-                    respValid <= 1'b1;
-                else begin
-                    respValid <= 1'b0;
-                    promiseCnt[addrIdx] = promiseCnt[addrIdx]+1;    
-                end           
-            end
-            
-            if(reqDataValid && (addrIdx == headPtr)) begin
-            end else begin
-                respValid <= 1'b0;
+        // readReqPref (Read requests which were initiated by transactions from the prefetching mechanism)
+        // Assupmtion: Prefetcher will not demand an existing readReq
+        else if(reqOpcode==3'd1) begin
+            if(!isFull) begin
+                validVec[tailPtr] <= 1'b1;
+                dataValidVec[tailPtr] <= 1'b0;
+                outstandingReqVec[tailPtr] <= 1'b1;
+                promiseCnt[addrIdx] <= {(PROMISE_WIDTH){1'b0}};
+                blockAddrMat[tailPtr] <= reqAddr;
+                tailPtr <= tailPtr + 1;
+            end else begin 
+                //Queue full!
+                errorCode <= 2'd2;
             end
         end
-        
-        // writeReqPref (requests which were initiated by transactions from the prefetching mechanism)
+
+        // readReqMaster (Read requests which were initiated by transactions from the MASTER)
         else if(reqOpcode==3'd2) begin
+            if(addrHit) begin
+                promiseCnt[addrIdx] <= promiseCnt[addrIdx] + 1'd1;
+            end
             if(!isFull) begin
                 validVec[tailPtr] <= 1'b1;
                 dataValidVec[tailPtr] <= 1'b0;
                 outstandingReqVec[tailPtr] <= 1'b1;
-                promiseCnt[addrIdx] <= (PROMISE_WIDTH-1)'d0;
+                promiseCnt[addrIdx] <= {{(PROMISE_WIDTH-1){1'b0}},1'b1};
                 blockAddrMat[tailPtr] <= reqAddr;
                 tailPtr <= tailPtr + 1;
             end else begin 
@@ -124,29 +129,36 @@ begin
             end
         end
 
-        // writeReqSlave (requests which were initiated by transactions from the slave port)
+        // readDataSlave (Receiving read data from SLAVE)
         else if(reqOpcode==3'd3) begin
-            if(!isFull) begin
-                validVec[tailPtr] <= 1'b1;
-                dataValidVec[tailPtr] <= 1'b0;
-                outstandingReqVec[tailPtr] <= 1'b1;
-                promiseCnt[addrIdx] <= (PROMISE_WIDTH-1)'d1;
-                blockAddrMat[tailPtr] <= reqAddr;
-                tailPtr <= tailPtr + 1;
-            end else begin 
-                //Queue full!
-                errorCode <= 2'd2;
-            end
-        end
-
-        // writeResp
-        else if(reqOpcode==3'd4) begin
             if(addrHit) begin
                 dataValidVec[addrIdx] <= 1'b1;
                 outstandingReqVec[addrIdx] <= 1'b0;
                 dataMat[addrIdx] <= reqData;
             end
         end 
+
+        // readDataPromise (Return data block that MASTER requested and is valid).
+            // Pops head if fulfilled all head promises, and nextHead is valid & his promise > 0.
+        if((reqOpcode==3'd4)) begin
+            if(!dataReady) begin
+                errorCode <= 2'd3; //Requesting data read when not ready
+            end else begin
+                if(!dataReady_head) begin //Head's promise == 0, nextHead is ready
+                    //Pop (even if data is invalid)
+                    validVec[headPtr] = 1'b0;
+                    headPtr = headPtr + 1'b1;
+                end 
+                //Current head's data is ready
+                respValid <= 1'b1;
+                promiseCnt[headPtr] = promiseCnt[headPtr] - 1'b1;
+            end
+        end
+
+        //Invalid opcode
+        else if(!reqOpcode == 3'd0) begin 
+            errorCode <= 2'd1; 
+        end
 	end
 end
 
