@@ -14,9 +14,6 @@ module prefetcherCtrl #(
     input logic     resetN,
     input logic     ctrlFlushN,
 
-    input logic     [0:ADDR_BITS-1] bar,
-    input logic     [0:ADDR_BITS-1] limit,
-    input logic     prefetcherHit, //data path output logic valid
     input logic     almostFull,
     input logic     [0:LOG_QUEUE_SIZE] prefetchReqCnt,
     input logic     pr_r_valid,
@@ -24,7 +21,6 @@ module prefetcherCtrl #(
     input logic     [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data,
     input logic     pr_addrHit,
     input logic     pr_hasOutstanding,
-    // input logic     pr_r_valid,
 
     output logic    pr_r_out_last,
     output logic    [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data,
@@ -32,7 +28,10 @@ module prefetcherCtrl #(
 
     output logic    [0:2] pr_opCode,
     output logic    rangeHit, //indicates that the request is the prefetcher range
+    output logic    [0:BURST_LEN_WIDTH-1] burstLen,
+    output logic    [0:TID_WIDTH-1] tagId,
     output logic    dataFlushN, //control bit to flush the queue
+    output logic    isCleanup, // indicates that the prefecher is in cleaning       
     
     //AXI AR (Read Request) slave port
     input logic s_ar_valid,
@@ -63,9 +62,10 @@ module prefetcherCtrl #(
     input logic [0:TID_WIDTH-1] m_r_id, //todo check this always matches the stored tagId
 
     //CR Space
+    input logic     [0:ADDR_BITS-1] bar,
+    input logic     [0:ADDR_BITS-1] limit,
     input logic     [0:LOG_QUEUE_SIZE] windowSize,
-    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
-    output logic    [0:BURST_LEN_WIDTH-1] burstLen
+    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt //the size of the counter that is used to divide the clk freq for the watchdog
 );
 
 // Slice's context
@@ -74,7 +74,7 @@ logic   [0:ADDR_BITS-1] currentStride;
 logic   [0:ADDR_BITS-1] storedStride;
 logic   [0:ADDR_BITS-1] nxtStride;
     // transaction id
-logic   [0:TID_WIDTH-1] tagId, nxt_tagId;
+logic   [0:TID_WIDTH-1] nxt_tagId;
     // burst length
 logic   [0:BURST_LEN_WIDTH-1] burstLen, nxt_burstLen;
 
@@ -313,7 +313,7 @@ assign currentStride = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles corr
 assign zeroStride = (currentStride == {ADDR_BITS{1'b0}});
 assign rangeHit = s_ar_valid && (s_ar_addr >= bar) && (s_ar_addr <= limit);
 assign prefetchAddrInRange = (prefetchAddr >= bar) && (prefetchAddr <= limit);
-assign strideMiss = (storedStride != currentStride) && !zeroStride;
-assign shouldCleanup = (s_ar_valid && (s_ar_id != tagId || s_ar_len != burstLen || (!rangeHit && tagId == s_ar_id))
-                            || ctrlFlushN;
+assign strideMiss = (storedStride != currentStride) && !zeroStride; //TODO where to use it??
+assign shouldCleanup = (s_ar_valid && (s_ar_id != tagId || s_ar_len != burstLen || (!rangeHit && tagId == s_ar_id)))
+                            || !ctrlFlushN;
 endmodule
