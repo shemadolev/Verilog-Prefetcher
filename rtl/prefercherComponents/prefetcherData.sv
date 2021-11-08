@@ -28,7 +28,7 @@ module	prefetcherData #(
 
     //local
     output logic	[0:BLOCK_DATA_SIZE_BITS-1] respData,
-    output logic	[0:ADDR_BITS-1] respAddr,
+    // output logic	[0:ADDR_BITS-1] respAddr,
     output logic	respLast,
     output logic	addrHit,
     
@@ -87,7 +87,7 @@ vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) tailBurstMask
 always_comb begin
     respData = dataMat[headPtr + burstOffset];
     respLast = lastVec[headPtr + burstOffset];
-    respAddr = blockAddrMat[headPtr];
+    //respAddr = blockAddrMat[headPtr];
     isFull = (QUEUE_SIZE - validCnt) < reqBurstLen;
     isEmpty = ~|validVec;
     almostFull = validCnt + (crs_almostFullSpacer * reqBurstLen)  >= QUEUE_SIZE;
