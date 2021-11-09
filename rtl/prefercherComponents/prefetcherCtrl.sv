@@ -12,7 +12,7 @@ module prefetcherCtrl #(
     input logic     clk,
     input logic     en,
     input logic     resetN,
-    input logic     ctrlFlushN,
+    input logic     ctrlFlush,
 
     input logic     almostFull,
     input logic     [0:LOG_QUEUE_SIZE] prefetchReqCnt,
@@ -59,7 +59,7 @@ module prefetcherCtrl #(
     output logic m_r_ready,
     input logic m_r_last,
     input logic [0:BLOCK_DATA_SIZE_BITS-1]  m_r_data,
-    input logic [0:TID_WIDTH-1] m_r_id, //todo check this always matches the stored tagId
+    input logic [0:TID_WIDTH-1] m_r_id,
 
     //CR Space
     input logic     [0:ADDR_BITS-1] bar,
@@ -145,7 +145,6 @@ always_ff @(posedge clk or negedge resetN) begin
             m_ar_len <= nxt_m_ar_len;
             m_ar_addr <= nxt_m_ar_addr;
             m_ar_id <= nxt_m_ar_id;
-
 
             s_r_valid <= nxt_s_r_valid;
             s_r_last <= nxt_s_r_in_last;
@@ -257,13 +256,15 @@ always_comb begin
                 nxt_st_exec = st_exec_s_r_polling;
             end
             else if (m_r_valid) begin
-                if(m_r_ready) begin
-                    nxt_pr_opCode = 3'd3; //readDataSlave
-                    nxt_pr_r_out_last = m_r_last;
-                    nxt_pr_r_out_data = m_r_data;
+                if(m_r_id == tagId) begin
+                    if(m_r_ready) begin
+                        nxt_pr_opCode = 3'd3; //readDataSlave
+                        nxt_pr_r_out_last = m_r_last;
+                        nxt_pr_r_out_data = m_r_data;
+                    end
+                    else
+                        nxt_m_r_ready = 1'b1;
                 end
-                else
-                    nxt_m_r_ready = 1'b1;
             end
             else if (prefetchAddr_valid & ~shouldCleanup) begin
                 nxt_pr_ar_ack = 1'b1;
