@@ -8,7 +8,7 @@ module prefetcherTop(
     //AXI AR (Read Request) slave port
     input logic s_ar_valid,
     output logic s_ar_ready,
-    input logic [0:BURST_LEN_WIDTH-1]s_ar_len,
+    input logic [0:BURST_LEN_WIDTH-1] s_ar_len,
     input logic [0:ADDR_BITS-1] s_ar_addr, 
     input logic [0:TID_WIDTH-1] s_ar_id,
 
@@ -57,7 +57,7 @@ module prefetcherTop(
     input logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer
 );
     
-logic   ctrlFlushN;
+logic   ctrlFlush;
 logic   almostFull;
 logic   [0:LOG_QUEUE_SIZE] prefetchReqCnt;
 logic   pr_r_valid;
@@ -76,7 +76,7 @@ logic   [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data;
 logic   [0:ADDR_BITS-1] pr_addr;   
 logic   cleanup_st;
 logic   sel_pr; // select 0 - DDR direct, 1 - Prefetcher
-
+logic   ctrl_context_valid;
 // prefetcher data - queue which stores all the data that is prefetched
   prefetcherData #(
     .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE), 
@@ -90,8 +90,8 @@ logic   sel_pr; // select 0 - DDR direct, 1 - Prefetcher
     .resetN(resetN), 
     .reqAddr(pr_addr), 
     .reqBurstLen(burstLen), 
-    .reqData(pr_r_in_data), 
-    .reqLast(pr_r_in_last) , 
+    .reqData(m_r_data), 
+    .reqLast(m_r_last) , 
     .reqOpcode(pr_opCode), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
     // outputs
@@ -119,7 +119,7 @@ prefetcherCtrl #(
     .clk(clk), 
     .en(en), 
     .resetN(resetN), 
-    .ctrlFlushN(ctrlFlushN), 
+    .ctrlFlush(ctrlFlush), 
     .almostFull(almostFull), 
     .prefetchReqCnt(prefetchReqCnt), 
     .pr_r_valid(pr_r_valid), 
@@ -136,32 +136,81 @@ prefetcherCtrl #(
     .tagId(tagId),
     .dataFlushN(dataFlushN), 
     .isCleanup(cleanup_st),
-    .s_ar_valid(), 
-    .s_ar_ready(), 
-    .s_ar_len(), 
-    .s_ar_addr(),  
-    .s_ar_id(), 
-    .m_ar_valid(), 
-    .m_ar_ready(), 
-    .m_ar_len(), 
-    .m_ar_addr(), 
-    .m_ar_id(), 
-    .s_r_valid(), 
-    .s_r_ready(), 
-    .s_r_last(), 
-    .s_r_data(), 
-    .s_r_id(), 
-    .m_r_valid(), 
-    .m_r_ready(), 
-    .m_r_last(), 
-    .m_r_data(), 
-    .m_r_id(), 
+    .context_valid(ctrl_context_valid),
+    .s_ar_valid(ctrl_s_ar_valid), //todo Declare all ctr_*
+    .s_ar_ready(ctrl_s_ar_ready), 
+    .s_ar_len(s_ar_len),
+    .s_ar_addr(s_ar_addr),  
+    .s_ar_id(s_ar_id), 
+    .m_ar_valid(ctrl_m_ar_valid), 
+    .m_ar_ready(ctrl_m_ar_ready), 
+    .m_ar_len(ctrl_m_ar_len), 
+    .m_ar_addr(ctrl_m_ar_addr), 
+    .m_ar_id(ctrl_m_ar_id), 
+    .s_r_valid(ctrl_s_r_valid), 
+    .s_r_ready(ctrl_s_r_ready), 
+    .s_r_last(ctrl_s_r_last), 
+    .s_r_data(ctrl_s_r_data), 
+    .s_r_id(ctrl_s_r_id), 
+    .m_r_valid(ctrl_m_r_valid), 
+    .m_r_ready(ctrl_m_r_ready),
+    // .m_r_last(), 
+    // .m_r_data(), 
+    .m_r_id(m_r_id),
     .bar(bar), 
     .limit(limit), 
     .windowSize(windowSize), 
     .watchdogCnt(watchdogCnt)
 );
 
-assign  prDataPath_resetN = resetN & dataFlushN;
-assign  sel_pr = cleanup_st | ((s_ar_addr >= bar) & (s_ar_addr <= limit));
-assign  ctrlFlushN = !(s_ar_valid & (s_ar_addr >= bar) & (s_ar_addr <= limit)) & (tagId == s_ar_id) // TODO continue
+always_comb begin
+    prDataPath_resetN = resetN & dataFlushN;
+    sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit));
+    sel_r_pr = ~m_r_valid | cleanup_st | (m_r_valid & (ctrl_context_valid & (tagId == m_r_id)));
+    ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & tagId == s_ar_id))) //ReadReq outside limits but same tag
+                | (s_aw_valid & ((s_ar_addr >= bar & s_ar_addr <= limit) | (ctrl_context_valid & tagId == s_ar_id))); //WriteReq in limits or same tag
+
+    if(sel_ar_pr) begin
+        //Path: Master-Prefetcher-Slave
+        s_ar_ready = ctrl_s_ar_ready;
+        ctrl_s_ar_valid = s_ar_valid & pr_ar_relevant;
+        
+        ctrl_m_ar_ready = m_ar_ready;
+        m_ar_valid = ctrl_m_ar_valid;
+        m_ar_len = ctrl_m_ar_len;
+        m_ar_addr = ctrl_m_ar_addr;
+        m_ar_id = ctrl_m_ar_id;
+    end else begin
+        //Path: Master-Slave
+        ctrl_m_ar_ready = 1'b0;
+        ctrl_s_ar_valid = 1'b0;
+
+        s_ar_ready = m_ar_ready;
+        m_ar_valid = s_ar_valid;
+        m_ar_len = s_ar_len;
+        m_ar_addr = s_ar_addr;
+        m_ar_id = s_ar_id;
+    end
+
+    if(sel_r_pr) begin
+        //Path: Master-Prefetcher-Slave
+        m_r_ready = ctrl_m_r_ready;
+        ctrl_m_r_valid = m_r_valid & pr_r_relevant;
+
+        ctrl_s_r_ready = s_r_ready;
+        s_r_valid = ctrl_s_r_valid;
+        s_r_last = pr_r_out_last;
+        s_r_data = pr_r_out_data;
+        s_r_id = ctrl_s_r_id;
+    end else begin
+        //Path: Master-Slave
+        ctrl_s_r_ready = 1'b0;
+        ctrl_m_r_valid = 1'b0;
+
+        m_r_ready = s_r_ready;
+        s_r_valid = m_r_valid;
+        s_r_last = m_r_last;
+        s_r_data = m_r_data;
+        s_r_id = m_r_id;
+    end
+end
