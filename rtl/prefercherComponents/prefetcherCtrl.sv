@@ -194,12 +194,12 @@ always_comb begin
         st_pr_active: begin
             if(shouldCleanup) begin
                 nxt_st_pr = st_pr_cleanup;
-            end else if((prefetchReqCnt < windowSize) && !almostFull && prefetchAddrInRange) begin
-                //Should fetch next block
-                nxtPrefetchAddr_valid = 1'b1; 
-                if(pr_ar_ack) begin
+            end else begin
+                if((prefetchReqCnt < windowSize) && ~almostFull && prefetchAddrInRange) //Should fetch next block
+                    nxtPrefetchAddr_valid = 1'b1; 
+                 
+                if(pr_ar_ack) 
                     nxt_prefetchAddr = prefetchAddr + storedStride;
-                end
             end
         end
         st_pr_cleanup: begin
