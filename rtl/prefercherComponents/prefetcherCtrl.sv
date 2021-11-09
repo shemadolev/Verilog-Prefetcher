@@ -313,7 +313,7 @@ assign currentStride = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles corr
 assign zeroStride = (currentStride == {ADDR_BITS{1'b0}});
 assign rangeHit = s_ar_valid && (s_ar_addr >= bar) && (s_ar_addr <= limit);
 assign prefetchAddrInRange = (prefetchAddr >= bar) && (prefetchAddr <= limit);
-assign strideMiss = (storedStride != currentStride) && !zeroStride; //TODO where to use it??
+assign strideMiss = (storedStride != currentStride) && !zeroStride; 
 assign shouldCleanup = (s_ar_valid && (s_ar_id != tagId || s_ar_len != burstLen || (!rangeHit && tagId == s_ar_id)))
-                            || !ctrlFlushN;
+                        || strideMiss || ctrlFlush;
 endmodule
