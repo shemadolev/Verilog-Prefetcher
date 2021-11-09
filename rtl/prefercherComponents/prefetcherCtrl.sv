@@ -31,7 +31,8 @@ module prefetcherCtrl #(
     output logic    [0:BURST_LEN_WIDTH-1] burstLen,
     output logic    [0:TID_WIDTH-1] tagId,
     output logic    dataFlushN, //control bit to flush the queue
-    output logic    isCleanup, // indicates that the prefecher is in cleaning       
+    output logic    isCleanup, // indicates that the prefecher is in cleaning
+    output logic    context_valid, // burst & tag were learned //todo assign values
     
     //AXI AR (Read Request) slave port
     input logic s_ar_valid,
@@ -116,7 +117,7 @@ always_ff @(posedge clk or negedge resetN) begin
         s_ar_addr_prev <= {ADDR_BITS{1'b0}};
         dataFlushN <= 1'b0;
         masterValid <= 1'b0;
-        ToBit <= 1'b0;    
+        ToBit <= 1'b0;
 	end
 	else begin
         if(en) begin
@@ -314,7 +315,9 @@ assign currentStride = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles corr
 assign zeroStride = (currentStride == {ADDR_BITS{1'b0}});
 assign rangeHit = s_ar_valid && (s_ar_addr >= bar) && (s_ar_addr <= limit);
 assign prefetchAddrInRange = (prefetchAddr >= bar) && (prefetchAddr <= limit);
-assign strideMiss = (storedStride != currentStride) && !zeroStride; 
-assign shouldCleanup = (s_ar_valid && (s_ar_id != tagId || s_ar_len != burstLen || (!rangeHit && tagId == s_ar_id)))
+assign strideMiss = (storedStride != currentStride) && !zeroStride;
+assign shouldCleanup = (s_ar_valid && (((s_ar_id != tagId | s_ar_len != burstLen) && rangeHit) || (!rangeHit && tagId == s_ar_id)))
                         || strideMiss || ctrlFlush;
+assign context_valid = cur_st_pr != st_pr_idle;
+
 endmodule
