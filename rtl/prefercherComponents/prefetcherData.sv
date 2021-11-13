@@ -28,7 +28,6 @@ module	prefetcherData #(
 
     //local
     output logic	[0:BLOCK_DATA_SIZE_BITS-1] respData,
-    // output logic	[0:ADDR_BITS-1] respAddr,
     output logic	respLast,
     output logic	addrHit,
     
@@ -87,7 +86,6 @@ vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) tailBurstMask
 always_comb begin
     respData = dataMat[headPtr + burstOffset];
     respLast = lastVec[headPtr + burstOffset];
-    //respAddr = blockAddrMat[headPtr];
     isFull = (QUEUE_SIZE - validCnt) < reqBurstLen;
     isEmpty = ~|validVec;
     almostFull = validCnt + (crs_almostFullSpacer * reqBurstLen)  >= QUEUE_SIZE;
@@ -110,84 +108,80 @@ begin
         readDataPtr <= {LOG_QUEUE_SIZE{1'b0}};;
         errorCode <= 3'b0;
         burstOffset <= {BURST_LEN_WIDTH{1'b0}};
-	end
-	    
-    else begin
+    end else begin
         errorCode <= 3'd0;
         case (reqOpcode)
-
-        // readReqPref (Read requests which were initiated by transactions from the prefetching mechanism)
-        // Assupmtion: Prefetcher will not demand an existing readReq
-        
-        3'd1: begin
-            if(!isFull) begin
-                validVec <= validVec | tailBurstMask;
-                dataValidVec <= dataValidVec & (~tailBurstMask);
-                prefetchReqVec[tailPtr] <= 1'b1;
-                promiseCnt[tailPtr] <= {(PROMISE_WIDTH){1'b0}};
-                blockAddrMat[tailPtr] <= reqAddr;
-                tailPtr <= tailPtr + reqBurstLen;
-            end else begin 
-                //Queue full!
-                errorCode <= 3'd2;
-            end
-        end
-
-        // readReqMaster (Read requests which were initiated by transactions from the MASTER)
-        3'd2: begin
-            if(addrHit) begin
-                promiseCnt[addrIdx] <= promiseCnt[addrIdx] + 1'd1;
-                prefetchReqVec[addrIdx] <= 1'b0;
-            end
-            if(!isFull) begin
-                validVec <= validVec | tailBurstMask;
-                dataValidVec <= dataValidVec & (~tailBurstMask);
-                prefetchReqVec[tailPtr] <= 1'b0;
-                promiseCnt[tailPtr] <= {{(PROMISE_WIDTH-1){1'b0}},1'b1};
-                blockAddrMat[tailPtr] <= reqAddr;
-                tailPtr <= tailPtr + reqBurstLen;
-            end else begin 
-                //Queue full!
-                errorCode <= 3'd2;
-            end
-        end
-
-        // readDataSlave (Receiving read data from SLAVE)
-        3'd3: begin
-            if(validVec[readDataPtr] != 1'b0) begin
-                dataValidVec[readDataPtr] <= 1'b1;
-                dataMat[readDataPtr] <= reqData;
-                lastVec[readDataPtr] <= reqLast;
-                readDataPtr <= readDataPtr + 1'b1;
-            end else begin
-                errorCode <= 3'd4; //Read data overflow
-            end
-        end 
-
-        // readDataPromise (Return data block that MASTER requested and is valid).
-            // Pops head if fulfilled all head promises, and nextHead is valid & his promise > 0.
-        3'd4: begin
-            if(!pr_r_valid) begin
-                errorCode <= 3'd3; //Requesting data read when not ready
-            end else begin
-                if(!dataReady_curBurst) begin //Head's promise == 0, nextHead is ready
-                    //Pop (even if data is invalid)
-                    validVec <= validVec & (~curBurstMask);
-                    headPtr = headPtr + reqBurstLen;
-                end 
-                //Current head's data is ready
-                burstOffset <= burstOffset + 1'b1;
-
-                if(lastVec[headPtr + burstOffset] == 1'b1) begin
-                    promiseCnt[headPtr] = promiseCnt[headPtr] - 1'b1;
-                    burstOffset <= 1'b0;
+            // readReqPref (Read requests which were initiated by transactions from the prefetching mechanism)
+            // Assupmtion: Prefetcher will not demand an existing readReq
+            3'd1: begin
+                if(!isFull) begin
+                    validVec <= validVec | tailBurstMask;
+                    dataValidVec <= dataValidVec & (~tailBurstMask);
+                    prefetchReqVec[tailPtr] <= 1'b1;
+                    promiseCnt[tailPtr] <= {(PROMISE_WIDTH){1'b0}};
+                    blockAddrMat[tailPtr] <= reqAddr;
+                    tailPtr <= tailPtr + reqBurstLen;
+                end else begin 
+                    //Queue full!
+                    errorCode <= 3'd2;
                 end
             end
-        end
 
-        //Invalid opcode
-        default: 
-            errorCode <= 3'd1; 
+            // readReqMaster (Read requests which were initiated by transactions from the MASTER)
+            3'd2: begin
+                if(addrHit) begin
+                    promiseCnt[addrIdx] <= promiseCnt[addrIdx] + 1'd1;
+                    prefetchReqVec[addrIdx] <= 1'b0;
+                end
+                if(!isFull) begin
+                    validVec <= validVec | tailBurstMask;
+                    dataValidVec <= dataValidVec & (~tailBurstMask);
+                    prefetchReqVec[tailPtr] <= 1'b0;
+                    promiseCnt[tailPtr] <= {{(PROMISE_WIDTH-1){1'b0}},1'b1};
+                    blockAddrMat[tailPtr] <= reqAddr;
+                    tailPtr <= tailPtr + reqBurstLen;
+                end else begin 
+                    //Queue full!
+                    errorCode <= 3'd2;
+                end
+            end
+
+            // readDataSlave (Receiving read data from SLAVE)
+            3'd3: begin
+                if(validVec[readDataPtr] != 1'b0) begin
+                    dataValidVec[readDataPtr] <= 1'b1;
+                    dataMat[readDataPtr] <= reqData;
+                    lastVec[readDataPtr] <= reqLast;
+                    readDataPtr <= readDataPtr + 1'b1;
+                end else begin
+                    errorCode <= 3'd4; //Read data overflow
+                end
+            end 
+
+            // readDataPromise (Return data block that MASTER requested and is valid).
+                // Pops head if fulfilled all head promises, and nextHead is valid & his promise > 0.
+            3'd4: begin
+                if(!pr_r_valid) begin
+                    errorCode <= 3'd3; //Requesting data read when not ready
+                end else begin
+                    if(!dataReady_curBurst) begin //Head's promise == 0, nextHead is ready
+                        //Pop (even if data is invalid)
+                        validVec <= validVec & (~curBurstMask);
+                        headPtr = headPtr + reqBurstLen;
+                    end 
+                    //Current head's data is ready
+                    burstOffset <= burstOffset + 1'b1;
+
+                    if(lastVec[headPtr + burstOffset] == 1'b1) begin
+                        promiseCnt[headPtr] = promiseCnt[headPtr] - 1'b1;
+                        burstOffset <= 1'b0;
+                    end
+                end
+            end
+
+            //Invalid opcode
+            default: 
+                errorCode <= 3'd1; 
         endcase
 	end
 end
