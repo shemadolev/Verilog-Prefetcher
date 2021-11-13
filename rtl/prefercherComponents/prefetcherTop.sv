@@ -66,14 +66,13 @@ logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data;
 logic pr_addrHit;
 logic pr_hasOutstanding;
 logic [0:2] pr_opCode;
-logic rangeHit;
 logic dataFlushN;
 logic prDataPath_resetN;
 logic [0:BURST_LEN_WIDTH-1] burstLen;
 logic [0:TID_WIDTH-1] tagId;
 logic pr_r_out_last;
 logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data;
-logic [0:ADDR_BITS-1] pr_addr;   
+logic [0:ADDR_BITS-1] pr_addr;
 logic cleanup_st;
 logic sel_pr; // select 0 - DDR direct, 1 - Prefetcher
 
@@ -147,7 +146,6 @@ prefetcherCtrl #(
     .pr_r_out_data(pr_r_out_data), 
     .pr_addr(pr_addr), 
     .pr_opCode(pr_opCode), 
-    .rangeHit(rangeHit), 
     .burstLen(burstLen), 
     .tagId(tagId),
     .dataFlushN(dataFlushN), 
