@@ -31,7 +31,7 @@ module prefetcherTop(
     output logic m_r_ready,
     input logic m_r_last,
     input logic [0:BLOCK_DATA_SIZE_BITS-1]  m_r_data,
-    input logic [0:TID_WIDTH-1] m_r_id, //todo check this always matches the stored tagId
+    input logic [0:TID_WIDTH-1] m_r_id,
 
     //AXI AW (Write Request) slave port
     input logic s_aw_valid,
@@ -54,11 +54,13 @@ module prefetcherTop(
     input logic     [0:LOG_QUEUE_SIZE] windowSize,
     input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
         // Data
-    input logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer
+    input logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer,
+
+    output logic    [0:2] errorCode
 );
     
 logic ctrlFlush;
-logic almostFull;
+logic pr_almostFull;
 logic [0:LOG_QUEUE_SIZE] prefetchReqCnt;
 logic pr_r_valid;
 logic pr_r_in_last;
@@ -66,13 +68,13 @@ logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data;
 logic pr_addrHit;
 logic pr_hasOutstanding;
 logic [0:2] pr_opCode;
-logic dataFlushN;
+logic pr_flush;
 logic prDataPath_resetN;
-logic [0:BURST_LEN_WIDTH-1] burstLen;
-logic [0:TID_WIDTH-1] tagId;
+logic [0:BURST_LEN_WIDTH-1] pr_m_ar_len;
+logic [0:TID_WIDTH-1] pr_m_ar_id;
 logic pr_r_out_last;
 logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data;
-logic [0:ADDR_BITS-1] pr_addr;
+logic [0:ADDR_BITS-1] pr_m_ar_addr;
 logic cleanup_st;
 logic sel_pr; // select 0 - DDR direct, 1 - Prefetcher
 
@@ -104,20 +106,19 @@ logic ctrl_m_r_ready;
     .clk(clk), 
     .resetN(resetN), 
     .reqAddr(pr_addr), 
-    .reqBurstLen(burstLen), 
+    .reqBurstLen(pr_m_ar_len), 
     .reqData(m_r_data), 
     .reqLast(m_r_last) , 
     .reqOpcode(pr_opCode), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
     // outputs
     .respData(pr_r_out_data), 
-    /*.respAddr(),*/ 
     .respLast(pr_r_out_last), 
     .addrHit(pr_addrHit),
     .pr_r_valid(pr_r_valid), 
     .prefetchReqCnt(prefetchReqCnt), 
-    .almostFull(almostFull), 
-    .errorCode(),
+    .pr_almostFull(pr_almostFull), 
+    .errorCode(errorCode),
     .hasOutstanding(pr_hasOutstanding)
 );
 
@@ -135,22 +136,20 @@ prefetcherCtrl #(
     .en(en), 
     .resetN(resetN), 
     .ctrlFlush(ctrlFlush), 
-    .almostFull(almostFull), 
+    .pr_almostFull(pr_almostFull), 
     .prefetchReqCnt(prefetchReqCnt), 
     .pr_r_valid(pr_r_valid), 
     .pr_r_in_last(pr_r_in_last), 
     .pr_r_in_data(pr_r_in_data), 
     .pr_addrHit(pr_addrHit), 
     .pr_hasOutstanding(pr_hasOutstanding), 
-    .pr_r_out_last(pr_r_out_last), 
-    .pr_r_out_data(pr_r_out_data), 
-    .pr_addr(pr_addr), 
+    .pr_m_ar_addr(pr_m_ar_addr), 
     .pr_opCode(pr_opCode), 
-    .burstLen(burstLen), 
-    .tagId(tagId),
-    .dataFlushN(dataFlushN), 
-    .isCleanup(cleanup_st),
-    .context_valid(ctrl_context_valid),
+    .pr_m_ar_len(pr_m_ar_len), 
+    .pr_m_ar_id(pr_m_ar_id),
+    .pr_flush(pr_flush), 
+    .pr_isCleanup(cleanup_st),
+    .pr_context_valid(ctrl_context_valid),
     .s_ar_valid(ctrl_s_ar_valid),
     .s_ar_ready(ctrl_s_ar_ready), 
     .s_ar_len(s_ar_len),
@@ -168,8 +167,6 @@ prefetcherCtrl #(
     .s_r_id(ctrl_s_r_id), 
     .m_r_valid(ctrl_m_r_valid), 
     .m_r_ready(ctrl_m_r_ready),
-    // .m_r_last(), 
-    // .m_r_data(), 
     .m_r_id(m_r_id),
     .bar(bar), 
     .limit(limit), 
@@ -178,11 +175,11 @@ prefetcherCtrl #(
 );
 
 always_comb begin
-    prDataPath_resetN = resetN & dataFlushN;
+    prDataPath_resetN = resetN & pr_flush;
     sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit)) | ctrl_m_ar_valid;
-    sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (tagId == m_r_id))) | ctrl_s_r_valid;
-    ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & tagId == s_ar_id))) //ReadReq outside limits but same tag
-                | (s_aw_valid & ((s_ar_addr >= bar & s_ar_addr <= limit) | (ctrl_context_valid & tagId == s_ar_id))); //WriteReq in limits or same tag
+    sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (pr_m_ar_id == m_r_id))) | ctrl_s_r_valid;
+    ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & pr_m_ar_id == s_ar_id))) //ReadReq outside limits but same tag
+                | (s_aw_valid & ((s_ar_addr >= bar & s_ar_addr <= limit) | (ctrl_context_valid & pr_m_ar_id == s_ar_id))); //WriteReq in limits or same tag
 
     if(sel_ar_pr) begin
         //Path: Master-Prefetcher-Slave

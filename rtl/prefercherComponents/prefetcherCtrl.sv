@@ -14,48 +14,47 @@ module prefetcherCtrl #(
     input logic     resetN,
     input logic     ctrlFlush,
 
-    input logic     almostFull,
-    input logic     [0:LOG_QUEUE_SIZE] prefetchReqCnt,
+    // Prefetch Data Path
+        // Control bits
+    output logic    pr_flush, //control bit to flush the queue
+    output logic    [0:2] pr_opCode,
+    input logic     pr_addrHit,
+    input logic     pr_hasOutstanding,
+    input logic     [0:LOG_QUEUE_SIZE] pr_reqCnt,
+    input logic     pr_almostFull,
+    output logic    pr_isCleanup, // indicates that the prefecher is in cleaning
+    output logic    pr_context_valid, // burst & tag were learned
+       // Read channel
     input logic     pr_r_valid,
     input logic     pr_r_in_last,
     input logic     [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data,
-    input logic     pr_addrHit,
-    input logic     pr_hasOutstanding,
+        //Read Req Channel
+    output logic    [0:ADDR_BITS-1] pr_m_ar_addr,
+    output logic    [0:BURST_LEN_WIDTH-1] pr_m_ar_len,
+    output logic    [0:TID_WIDTH-1] pr_m_ar_id,
 
-    output logic    pr_r_out_last,
-    output logic    [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data,
-    output logic    [0:ADDR_BITS-1] pr_addr,
-
-    output logic    [0:2] pr_opCode,
-    output logic    rangeHit, //indicates that the request is the prefetcher range
-    output logic    [0:BURST_LEN_WIDTH-1] burstLen,
-    output logic    [0:TID_WIDTH-1] tagId,
-    output logic    dataFlushN, //control bit to flush the queue
-    output logic    isCleanup, // indicates that the prefecher is in cleaning
-    output logic    context_valid, // burst & tag were learned //todo assign values
-    
-    //AXI AR (Read Request) slave port
+    // Slave AXI ports (PR <-> NVDLA)
+        //AR (Read Request)
     input logic s_ar_valid,
     output logic s_ar_ready,
     input logic [0:BURST_LEN_WIDTH-1]s_ar_len,
     input logic [0:ADDR_BITS-1] s_ar_addr, 
     input logic [0:TID_WIDTH-1] s_ar_id,
-
-    //AXI AR (Read Request) master port
-    output logic m_ar_valid,
-    input logic m_ar_ready,
-    output logic [0:BURST_LEN_WIDTH-1] m_ar_len,
-    output logic [0:ADDR_BITS-1] m_ar_addr,
-    output logic [0:TID_WIDTH-1] m_ar_id,
-
-    //AXI R (Read data) slave port
+        //R (Read data)
     output logic s_r_valid,
     input logic s_r_ready,
     output logic s_r_last,
     output logic [0:BLOCK_DATA_SIZE_BITS-1] s_r_data,
     output logic [0:TID_WIDTH-1] s_r_id,
 
-    //AXI R (Read data) master port
+    // Master AXI ports (PR <-> DDR)
+        //AR (Read Request)
+    output logic m_ar_valid,
+    input logic m_ar_ready,
+    output logic [0:BURST_LEN_WIDTH-1] m_ar_len,
+    output logic [0:ADDR_BITS-1] m_ar_addr,
+    output logic [0:TID_WIDTH-1] m_ar_id,
+        //R (Read data)
     input logic m_r_valid,
     output logic m_r_ready,
     input logic [0:TID_WIDTH-1] m_r_id,
@@ -68,30 +67,25 @@ module prefetcherCtrl #(
 );
 
 // Slice's context
-    // stride
-logic   [0:ADDR_BITS-1] currentStride;
-logic   [0:ADDR_BITS-1] storedStride;
-logic   [0:ADDR_BITS-1] nxtStride;
-    // transaction id
-logic   [0:TID_WIDTH-1] nxt_tagId;
-    // burst length
-logic   [0:BURST_LEN_WIDTH-1] burstLen, nxt_burstLen;
+logic   [0:ADDR_BITS-1] stride_sampled, stride_reg, stride_next;
+logic   [0:TID_WIDTH-1] pr_m_ar_id_next;
+logic   [0:BURST_LEN_WIDTH-1] pr_m_ar_len, pr_m_ar_len_next;
 
 // Slice's learning 
 logic   [0:ADDR_BITS-1] s_ar_addr_prev;
-logic   [0:ADDR_BITS-1] prefetchAddr, nxt_prefetchAddr, nxtPpefetchAddr_last;
+logic   [0:ADDR_BITS-1] prefetchAddr_reg, prefetchAddr_next; //The address that should be prefetched
 
 // Control bits
-logic   reqValid, strideMiss, nxt_dataFlushN, nxtMasterValid, nxt_pr_ar_ack;
-logic   nxtSlaveReady, prefetchAddrInRange, zeroStride, ToBit, prefetchAddr_valid, nxtPrefetchAddr_valid;
-logic    [0:2] nxt_pr_opCode;
-logic    [0:ADDR_BITS-1] nxt_pr_addr;
-logic    [0:BURST_LEN_WIDTH-1] nxt_m_ar_len;
-logic    [0:ADDR_BITS-1] nxt_m_ar_addr;
-logic    [0:TID_WIDTH-1] nxt_m_ar_id;
+logic   reqValid, strideMiss, pr_flush_next, pr_ar_ack_next, rangeHit;
+logic   slaveReady_next, prefetchAddrInRange, zeroStride, ToBit, prefetchAddr_valid, prefetchAddr_valid_next;
+logic   [0:2] pr_opCode_next;
+logic   [0:ADDR_BITS-1] pr_m_ar_addr_next;
+logic   [0:BURST_LEN_WIDTH-1] m_ar_len_next;
+logic   [0:ADDR_BITS-1] m_ar_addr_next;
+logic   [0:TID_WIDTH-1] m_ar_id_next;
 
-logic nxt_s_r_valid, nxt_s_r_in_last, pr_r_out_last;
-logic [0:BLOCK_DATA_SIZE_BITS-1] nxt_s_r_data;
+logic s_r_valid_next, s_r_in_last_next;
+logic [0:BLOCK_DATA_SIZE_BITS-1] s_r_data_next;
 
 //watchdog
 logic watchdogHit;
@@ -104,17 +98,16 @@ clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
             );
 
 //FSM States
-enum logic [1:0] {st_pr_idle, st_pr_arm, st_pr_active, st_pr_cleanup} cur_st_pr, nxt_st_pr;
-enum logic [1:0] {st_exec_idle,st_exec_s_ar_polling,st_exec_pr_ar_polling,st_exec_s_r_polling} cur_st_exec, nxt_st_exec;
+enum logic [1:0] {ST_PR_IDLE, ST_PR_ARM, ST_PR_ACTIVE, ST_PR_CLEANUP} st_pr_cur, st_pr_next;
+enum logic [1:0] {ST_EXEC_IDLE,ST_EXEC_S_AR_POLLING,ST_EXEC_PR_AR_POLLING,ST_EXEC_S_R_POLLING} st_exec_cur, st_exec_next;
 
 always_ff @(posedge clk or negedge resetN) begin
 	if(!resetN || (watchdogHit && !watchdogHit_d && ToBit==1'b1)) begin
-		cur_st_pr <= st_pr_idle;
-        cur_st_exec <= st_exec_idle;
-        storedStride <= {ADDR_BITS{1'b0}};
+		st_pr_cur <= ST_PR_IDLE;
+        st_exec_cur <= ST_EXEC_IDLE;
+        stride_reg <= {ADDR_BITS{1'b0}};
         s_ar_addr_prev <= {ADDR_BITS{1'b0}};
-        dataFlushN <= 1'b0;
-        masterValid <= 1'b0;
+        pr_flush <= 1'b0;
         ToBit <= 1'b0;
 	end
 	else begin
@@ -123,84 +116,84 @@ always_ff @(posedge clk or negedge resetN) begin
                 // watchdog description: ToBit += 1 every watchdog rise. Resets on any read request / response. When reaches max value, flush all.
                 ToBit <= ~ToBit;
             end
-            cur_st_pr <= nxt_st_pr;
-            cur_st_exec <= nxt_st_exec;
-            
             s_ar_addr_prev <= s_ar_addr;
-            storedStride <= nxtStride;
-            dataFlushN <= nxt_dataFlushN;
             
-            prefetchAddr_valid <= nxtPrefetchAddr_valid;
-            prefetchAddr <= nxt_prefetchAddr;
+            st_pr_cur <= st_pr_next;
+            st_exec_cur <= st_exec_next;
             
-            tagId <= nxt_tagId;
-            burstLen <= nxt_burstLen;
+            stride_reg <= stride_next;
+            pr_flush <= pr_flush_next;
             
-            pr_opCode <= nxt_pr_opCode;
-            pr_addr <= nxt_pr_addr;
+            prefetchAddr_valid <= prefetchAddr_valid_next;
+            prefetchAddr_reg <= prefetchAddr_next;
             
-            s_ar_ready <= nxt_s_ar_ready;
+            pr_m_ar_id <= pr_m_ar_id_next;
+            pr_m_ar_len <= pr_m_ar_len_next;
+            
+            pr_opCode <= pr_opCode_next;
+            pr_m_ar_addr <= pr_m_ar_addr_next;
+            
+            s_ar_ready <= s_ar_ready_next;
 
-            m_ar_len <= nxt_m_ar_len;
-            m_ar_addr <= nxt_m_ar_addr;
-            m_ar_id <= nxt_m_ar_id;
+            m_ar_len <= m_ar_len_next;
+            m_ar_addr <= m_ar_addr_next;
+            m_ar_id <= m_ar_id_next;
 
-            s_r_valid <= nxt_s_r_valid;
-            s_r_last <= nxt_s_r_in_last;
-            s_r_data <= nxt_s_r_data;
+            s_r_valid <= s_r_valid_next;
+            s_r_last <= s_r_in_last_next;
+            s_r_data <= s_r_data_next;
             
-            pr_ar_ack <= nxt_pr_ar_ack;
+            pr_ar_ack <= pr_ar_ack_next;
 
-            m_r_ready <= nxt_m_r_ready;
+            m_r_ready <= m_r_ready_next;
         end
     end
 end
 
 //Prefetch FSM comb' logic
 always_comb begin
-    nxt_st_pr = cur_st_pr;
-    nxtStride = storedStride;
-    nxt_dataFlushN = 1'b1;
-    nxtPrefetchAddr_valid = 1'b0;
-    nxt_burstLen = burstLen;
-    nxt_tagId = tagId;
-    nxt_prefetchAddr = prefetchAddr;
+    stride_next = stride_reg;
+    prefetchAddr_valid_next = 1'b0;
+    st_pr_next = st_pr_cur;
+    pr_flush_next = 1'b0;
+    pr_m_ar_len_next = pr_m_ar_len;
+    pr_m_ar_id_next = pr_m_ar_id;
+    prefetchAddr_next = prefetchAddr_reg;
 
-    // if(masterValid == 1'b0) begin
-    case (cur_st_pr)
-        st_pr_idle: begin
+    case (st_pr_cur)
+        ST_PR_IDLE: begin
             if(rangeHit) begin
-                nxt_st_pr = st_pr_arm;
-                nxt_burstLen = s_ar_len;
-                nxt_tagId = s_ar_id;
+                st_pr_next = ST_PR_ARM;
+                pr_m_ar_len_next = s_ar_len;
+                pr_m_ar_id_next = s_ar_id;
             end
         end
-        st_pr_arm: begin
+        ST_PR_ARM: begin
             if(shouldCleanup) begin
-                nxt_st_pr = st_pr_cleanup;
+                st_pr_next = ST_PR_CLEANUP;
             end
             else if(rangeHit && !zeroStride) begin
-                nxt_st_pr = st_pr_active;
-                nxtStride = currentStride;
-                nxt_prefetchAddr = s_ar_addr + currentStride;
+                st_pr_next = ST_PR_ACTIVE;
+                stride_next = stride_sampled;
+                prefetchAddr_next = s_ar_addr + stride_sampled;
             end
         end 
 
-        st_pr_active: begin
+        ST_PR_ACTIVE: begin
             if(shouldCleanup) begin
-                nxt_st_pr = st_pr_cleanup;
+                st_pr_next = ST_PR_CLEANUP;
             end else begin
-                if((prefetchReqCnt < windowSize) && ~almostFull && prefetchAddrInRange) //Should fetch next block
-                    nxtPrefetchAddr_valid = 1'b1; 
+                if((pr_reqCnt < windowSize) && ~pr_almostFull && prefetchAddrInRange) //Should fetch next block
+                    prefetchAddr_valid_next = 1'b1; 
                  
                 if(pr_ar_ack) 
-                    nxt_prefetchAddr = prefetchAddr + storedStride;
+                    prefetchAddr_next = prefetchAddr_reg + stride_reg;
             end
         end
-        st_pr_cleanup: begin
+        ST_PR_CLEANUP: begin
             if(~pr_r_valid & ~hasOutstanding) begin
-                nxt_st_pr = st_pr_idle;
-                nxt_dataFlushN = 1'b0;
+                st_pr_next = ST_PR_IDLE;
+                pr_flush_next = 1'b1;
             end
         end 
     endcase
@@ -208,112 +201,111 @@ end
 
 //Execution FSM comb' logic
 always_comb begin
-    nxt_pr_opCode = 3'd0;
-    nxt_s_ar_ready = 1'b0;
-    nxt_pr_addr = pr_addr;
+    pr_opCode_next = 3'd0; //NOP
+    s_ar_ready_next = 1'b0;
+    pr_m_ar_addr_next = pr_m_ar_addr;
     
-    nxt_m_ar_len = m_ar_len;
-    nxt_m_ar_addr = m_ar_addr;
-    nxt_m_ar_id = m_ar_id;
+    m_ar_len_next = m_ar_len;
+    m_ar_addr_next = m_ar_addr;
+    m_ar_id_next = m_ar_id;
+    m_ar_valid_next = 1'b0;
     
-    nxt_s_r_valid = 1'b0;
-    nxt_s_r_in_last = s_r_last;
-    nxt_s_r_data = s_r_data;
+    s_r_valid_next = 1'b0;
+    s_r_in_last_next = s_r_last;
+    s_r_data_next = s_r_data;
 
-    nxt_pr_r_out_last = pr_r_out_last;
+    s_r_id = pr_m_ar_id;
 
-    s_r_id = tagId;
+    m_r_ready_next = 1'b0;
+    pr_ar_ack_next = 1'b0;
 
-    nxt_m_r_ready = 1'b0;
-
-    nxt_pr_ar_ack = 1'b0;
-
-    case (cur_st_exec)
-        st_exec_idle: begin 
-            if(s_ar_valid & ~shouldCleanup & |(cur_st_pr ^ st_pr_cleanup)) begin
+    case (st_exec_cur)
+        ST_EXEC_IDLE: begin 
+            if(s_ar_valid & ~shouldCleanup & |(st_pr_cur ^ ST_PR_CLEANUP)) begin
                 if(s_ar_ready) begin
-                    nxt_pr_opCode = 3'd2; //readReqMaster
-                    nxt_pr_addr = s_ar_addr;
-                    
-                    nxt_m_ar_len = s_ar_len;
-                    nxt_m_ar_id = s_ar_id;
-                    nxt_m_ar_addr = s_ar_addr;
+                    pr_opCode_next = 3'd2; //readReqMaster
+                    pr_m_ar_addr_next = s_ar_addr;
 
-                    nxt_st_exec = st_exec_s_ar_polling;
-                end
-                else
-                    nxt_s_ar_ready = 1'b1;
+                    m_ar_len_next = s_ar_len;
+                    m_ar_id_next = s_ar_id;
+                    m_ar_addr_next = s_ar_addr;
+
+                    st_exec_next = ST_EXEC_S_AR_PR_ACCESS;
+                end else
+                    s_ar_ready_next = 1'b1;
             end
             else if (pr_r_valid) begin
-                nxt_s_r_valid = 1'b1;
-                nxt_s_r_in_last = pr_r_in_last;
-                nxt_s_r_data = pr_r_data;
-                nxt_pr_opCode = 3'd4; //readDataPromise
-                nxt_st_exec = st_exec_s_r_polling;
+                s_r_valid_next = 1'b1;
+                s_r_in_last_next = pr_r_in_last;
+                s_r_data_next = pr_r_data;
+                pr_opCode_next = 3'd4; //readDataPromise
+                st_exec_next = ST_EXEC_S_R_POLLING;
             end
             else if (m_r_valid) begin
-                if(m_r_id == tagId) begin
-                    if(m_r_ready) begin
-                        nxt_pr_opCode = 3'd3; //readDataSlave
-                    end
+                if(m_r_id == pr_m_ar_id) begin
+                    if(m_r_ready)
+                        pr_opCode_next = 3'd3; //readDataSlave
                     else
-                        nxt_m_r_ready = 1'b1;
+                        m_r_ready_next = 1'b1;
                 end
             end
             else if (prefetchAddr_valid & ~shouldCleanup) begin
-                nxt_pr_ar_ack = 1'b1;
-                nxt_pr_opCode = 3'd1; //readReqPref
-                nxt_pr_addr = prefetchAddr;
-                nxt_st_exec = st_exec_pr_ar_polling;
-                nxt_m_ar_len = burstLen;
-                nxt_m_ar_id  = tagId;
-                nxt_m_ar_valid = 1'b1;
+                pr_ar_ack_next = 1'b1;
+                pr_opCode_next = 3'd1; //readReqPref
+                pr_m_ar_addr_next = prefetchAddr_reg;
+                
+                m_ar_valid_next = 1'b1;
+                m_ar_len_next = pr_m_ar_len;
+                m_ar_id_next  = pr_m_ar_id;
+                m_ar_addr_next = prefetchAddr_reg;
+
+                st_exec_next = ST_EXEC_PR_AR_POLLING;
             end
         end
 
-        st_exec_s_r_polling: begin
-            nxt_s_r_valid = 1'b1;
+        ST_EXEC_S_R_POLLING: begin
+            s_r_valid_next = 1'b1;
             if(s_r_ready) begin
-                nxt_s_r_valid = 1'b0;
-                cur_st_exec = st_exec_idle;
+                s_r_valid_next = 1'b0;
+                st_exec_next = ST_EXEC_IDLE;
             end
         end
 
-        st_exec_pr_ar_polling: begin
-            nxt_m_ar_valid = 1'b1;
+        ST_EXEC_PR_AR_POLLING: begin
+            m_ar_valid_next = 1'b1;
             if(m_ar_ready) begin
-                nxt_st_exec = st_exec_idle;
-                nxt_m_ar_valid = 1'b0;
+                m_ar_valid_next = 1'b0;
+                st_exec_next = ST_EXEC_IDLE;
             end
         end
 
-        st_exec_s_ar_polling: begin
+        ST_EXEC_S_AR_PR_ACCESS: begin
             if(pr_addrHit)
-                nxt_st_exec = st_exec_idle;
+                st_exec_next = ST_EXEC_IDLE;
             else begin
-                nxt_m_ar_valid = 1'b1;
-                if(m_ar_ready & m_ar_valid) begin
-                    nxt_st_exec = st_exec_idle;
-                    nxt_m_ar_valid = 1'b0;
-                end
+                m_ar_valid_next = 1'b1;
+                st_exec_next = ST_EXEC_S_AR_POLLING;
             end
+        end
+
+        ST_EXEC_S_AR_POLLING: begin
+            if(m_ar_ready & m_ar_valid) begin
+                m_ar_valid_next = 1'b0;
+                st_exec_next = ST_EXEC_IDLE;
+            end else
+                m_ar_valid_next = 1'b1;
         end
     endcase
 end
 
-//TODO Address calcs should drop the block bits
-
 // signals assignment
-assign currentStride = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles correctly negative strides
-assign zeroStride = (currentStride == {ADDR_BITS{1'b0}});
+assign stride_sampled = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles correctly negative strides
+assign zeroStride = (stride_sampled == {ADDR_BITS{1'b0}});
 assign rangeHit = s_ar_valid && (s_ar_addr >= bar) && (s_ar_addr <= limit);
-assign prefetchAddrInRange = (prefetchAddr >= bar) && (prefetchAddr <= limit);
-assign strideMiss = (storedStride != currentStride) && !zeroStride;
-assign shouldCleanup = (s_ar_valid && (((s_ar_id != tagId | s_ar_len != burstLen) && rangeHit) || (!rangeHit && tagId == s_ar_id)))
+assign prefetchAddrInRange = (prefetchAddr_reg >= bar) && (prefetchAddr_reg <= limit);
+assign strideMiss = (stride_reg != stride_sampled) && !zeroStride;
+assign shouldCleanup = (s_ar_valid && (((s_ar_id != pr_m_ar_id | s_ar_len != pr_m_ar_len) && rangeHit) || (!rangeHit && pr_m_ar_id == s_ar_id)))
                         || strideMiss || ctrlFlush;
-assign context_valid = cur_st_pr != st_pr_idle;
+assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
 
 endmodule
-
-//todo Capitalize enum values
-//todo X_next, X_reg
