@@ -57,29 +57,45 @@ module prefetcherTop(
     input logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer
 );
     
-logic   ctrlFlush;
-logic   almostFull;
-logic   [0:LOG_QUEUE_SIZE] prefetchReqCnt;
-logic   pr_r_valid;
-logic   pr_r_in_last;
-logic   [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data;
-logic   pr_addrHit;
-logic   pr_hasOutstanding;
-logic   [0:2] pr_opCode;
-logic   rangeHit;
-logic   dataFlushN;
-logic   prDataPath_resetN;
-logic   [0:BURST_LEN_WIDTH-1] burstLen;
-logic    [0:TID_WIDTH-1] tagId;
-logic   pr_r_out_last;
-logic   [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data;
-logic   [0:ADDR_BITS-1] pr_addr;   
-logic   cleanup_st;
-logic   sel_pr; // select 0 - DDR direct, 1 - Prefetcher
-logic   ctrl_context_valid;
+logic ctrlFlush;
+logic almostFull;
+logic [0:LOG_QUEUE_SIZE] prefetchReqCnt;
+logic pr_r_valid;
+logic pr_r_in_last;
+logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data;
+logic pr_addrHit;
+logic pr_hasOutstanding;
+logic [0:2] pr_opCode;
+logic rangeHit;
+logic dataFlushN;
+logic prDataPath_resetN;
+logic [0:BURST_LEN_WIDTH-1] burstLen;
+logic [0:TID_WIDTH-1] tagId;
+logic pr_r_out_last;
+logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data;
+logic [0:ADDR_BITS-1] pr_addr;   
+logic cleanup_st;
+logic sel_pr; // select 0 - DDR direct, 1 - Prefetcher
+
+logic ctrl_context_valid;
+logic ctrl_s_ar_valid;
+logic ctrl_s_ar_ready;
+logic ctrl_m_ar_valid;
+logic ctrl_m_ar_ready;
+logic [0:BURST_LEN_WIDTH-1] ctrl_m_ar_len;
+logic [0:ADDR_BITS-1] ctrl_m_ar_addr;
+logic [0:TID_WIDTH-1] ctrl_m_ar_id;
+logic ctrl_s_r_valid;
+logic ctrl_s_r_ready;
+logic ctrl_s_r_last;
+logic [0:BLOCK_DATA_SIZE_BITS-1] ctrl_s_r_data;
+logic [0:TID_WIDTH-1] ctrl_s_r_id;
+logic ctrl_m_r_valid;
+logic ctrl_m_r_ready;
+
 // prefetcher data - queue which stores all the data that is prefetched
   prefetcherData #(
-    .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE), 
+    .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
     .LOG_BLOCK_DATA_BYTES(LOG_BLOCK_DATA_BYTES),
     .ADDR_BITS(ADDR_BITS), 
     .PROMISE_WIDTH(PROMISE_WIDTH),
@@ -137,7 +153,7 @@ prefetcherCtrl #(
     .dataFlushN(dataFlushN), 
     .isCleanup(cleanup_st),
     .context_valid(ctrl_context_valid),
-    .s_ar_valid(ctrl_s_ar_valid), //todo Declare all ctr_*
+    .s_ar_valid(ctrl_s_ar_valid),
     .s_ar_ready(ctrl_s_ar_ready), 
     .s_ar_len(s_ar_len),
     .s_ar_addr(s_ar_addr),  
@@ -166,7 +182,7 @@ prefetcherCtrl #(
 always_comb begin
     prDataPath_resetN = resetN & dataFlushN;
     sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit));
-    sel_r_pr = ~m_r_valid | cleanup_st | (m_r_valid & (ctrl_context_valid & (tagId == m_r_id)));
+    sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (tagId == m_r_id)));
     ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & tagId == s_ar_id))) //ReadReq outside limits but same tag
                 | (s_aw_valid & ((s_ar_addr >= bar & s_ar_addr <= limit) | (ctrl_context_valid & tagId == s_ar_id))); //WriteReq in limits or same tag
 
