@@ -181,8 +181,8 @@ prefetcherCtrl #(
 
 always_comb begin
     prDataPath_resetN = resetN & dataFlushN;
-    sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit));
-    sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (tagId == m_r_id)));
+    sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit)) | ctrl_m_ar_valid;
+    sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (tagId == m_r_id))) | ctrl_s_r_valid;
     ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & tagId == s_ar_id))) //ReadReq outside limits but same tag
                 | (s_aw_valid & ((s_ar_addr >= bar & s_ar_addr <= limit) | (ctrl_context_valid & tagId == s_ar_id))); //WriteReq in limits or same tag
 
