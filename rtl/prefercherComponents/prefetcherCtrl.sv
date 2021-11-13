@@ -58,8 +58,6 @@ module prefetcherCtrl #(
     //AXI R (Read data) master port
     input logic m_r_valid,
     output logic m_r_ready,
-    input logic m_r_last,
-    input logic [0:BLOCK_DATA_SIZE_BITS-1]  m_r_data,
     input logic [0:TID_WIDTH-1] m_r_id,
 
     //CR Space
@@ -151,9 +149,6 @@ always_ff @(posedge clk or negedge resetN) begin
             s_r_last <= nxt_s_r_in_last;
             s_r_data <= nxt_s_r_data;
             
-            pr_r_out_last <= nxt_m_r_last;
-            pr_r_out_data <= nxt_m_r_data;
-
             pr_ar_ack <= nxt_pr_ar_ack;
 
             m_r_ready <= nxt_m_r_ready;
@@ -260,8 +255,6 @@ always_comb begin
                 if(m_r_id == tagId) begin
                     if(m_r_ready) begin
                         nxt_pr_opCode = 3'd3; //readDataSlave
-                        nxt_pr_r_out_last = m_r_last;
-                        nxt_pr_r_out_data = m_r_data;
                     end
                     else
                         nxt_m_r_ready = 1'b1;
@@ -321,3 +314,6 @@ assign shouldCleanup = (s_ar_valid && (((s_ar_id != tagId | s_ar_len != burstLen
 assign context_valid = cur_st_pr != st_pr_idle;
 
 endmodule
+
+//todo Capitalize enum values
+//todo X_next, X_reg
