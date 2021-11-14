@@ -280,7 +280,7 @@ always_comb begin
         end
 
         ST_EXEC_S_AR_PR_ACCESS: begin
-            if(pr_addrHit)
+            if(pr_addrHit) //TODO check on which clk addrHit raises
                 st_exec_next = ST_EXEC_IDLE;
             else begin
                 m_ar_valid_next = 1'b1;

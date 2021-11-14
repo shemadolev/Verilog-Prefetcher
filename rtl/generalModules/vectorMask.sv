@@ -3,7 +3,7 @@
 //Note: If tailPtr == headPtr, a vector of all 1's will be returned (because assuming cyclic vector array)
 
 module vectorMask #(
-    parameter LOG_WIDTH = 3'd6,
+    parameter LOG_WIDTH = 4'd8,
     parameter WIDTH = 1<<LOG_WIDTH
 ) (
     input logic [LOG_WIDTH-1:0] headIdx,

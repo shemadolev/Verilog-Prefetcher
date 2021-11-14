@@ -7,7 +7,7 @@
                     0 - no error, 1 - Invalid opcode, 2 - ReadReq to full queue, 3 - Requesting data read when not ready, 4 - Read data overflow
  */
 module	prefetcherData #(
-    parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
+    parameter LOG_QUEUE_SIZE = 4'd8, // the size of the queue [2^x] 
     localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE,
     parameter LOG_BLOCK_DATA_BYTES = 3'd6, //[Bytes]
     localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3, //shift left by 3 to convert Bytes->bits

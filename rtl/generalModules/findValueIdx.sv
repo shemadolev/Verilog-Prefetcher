@@ -1,5 +1,5 @@
 module findValueIdx #(
-    parameter LOG_VEC_SIZE = 3'd6,
+    parameter LOG_VEC_SIZE = 4'd8,
     parameter VEC_SIZE = 1<<LOG_VEC_SIZE,
     parameter TAG_SIZE = 7'd64
 
