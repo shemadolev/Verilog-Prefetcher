@@ -23,21 +23,23 @@ for(int i=0;i<MOD.QUEUE_SIZE;i++) begin \
     $display("  outstanding %b",MOD.outstandingReqVec[i]); \
 end \
 $display(" ** Resp data **"); \
-$display(" respValid:%b respData:0x%h",MOD.respValid,MOD.respData); \
+$display(" pr_r_valid:%b respData:0x%h",MOD.pr_r_valid,MOD.respData); \
 $display("------- END Prefetcher State --------")
-
-module prefetcherDataTb ();
 
     localparam LOG_QUEUE_SIZE = 3'd3; // the size of the queue [2^x] 
     localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE;
     localparam LOG_BLOCK_DATA_BYTES = 3'd3; //[Bytes]
     localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3; //shift left by 3 to convert Bytes->bits
     localparam ADDR_BITS = 7'd64; // the size of the address [bits]
+    localparam PROMISE_WIDTH = 3'd3; // the log size of the promise's counter
+    localparam BURST_LEN_WIDTH = 4'd8; //NVDLA max is 3, AXI4 supports up to 8 bits
 
     logic   clk;
     logic   resetN;
     logic   [0:ADDR_BITS-1] reqAddr;
+    logic   [0:BURST_LEN_WIDTH-1] reqBurstLen;
     logic   [0:BLOCK_DATA_SIZE_BITS-1] reqData;
+    logic   reqLast;
     logic   [0:2] reqOpcode;
 
     //CRS
@@ -45,30 +47,39 @@ module prefetcherDataTb ();
     //TODO input the actual requested size of block
 
     //local
-    logic    respValid;
+    logic   pr_r_valid;
     logic	[0:BLOCK_DATA_SIZE_BITS-1] respData;
+    logic	respLast;
+    logic	addrHit;
     
     //global
-    logic	[0:LOG_QUEUE_SIZE] outstandingReqCnt;
+    logic	[0:LOG_QUEUE_SIZE] prefetchReqCnt;
     logic	almostFull; //If queue is {crs_almostFullSpacer} blocks from being full
-    logic    [0:1] errorCode;
+    logic   [0:2] errorCode;
+    logic   hasOutstanding;
 
 prefetcherData #(
     .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
     .LOG_BLOCK_DATA_BYTES(LOG_BLOCK_DATA_BYTES),
-    .ADDR_BITS(ADDR_BITS)
+    .ADDR_BITS(ADDR_BITS),
+    .PROMISE_WIDTH(PROMISE_WIDTH),
+    .BURST_LEN_WIDTH(BURST_LEN_WIDTH)
 ) prefetcherData_dut (
     .clk(clk),
     .resetN(resetN),
     .reqAddr(reqAddr),
+    .reqBurstLen(reqBurstLen),
     .reqData(reqData),
     .reqOpcode(reqOpcode),
     .crs_almostFullSpacer(crs_almostFullSpacer), 
-    .respValid(respValid),
     .respData(respData),
-    .outstandingReqCnt(outstandingReqCnt),
+    .respLast(respLast),
+    .addrHit(addrHit),
+    .pr_r_valid(pr_r_valid),
+    .prefetchReqCnt(prefetchReqCnt),
     .almostFull(almostFull), //If queue is {crs_almostFullSpacer} blocks from being full
-    .errorCode(errorCode)
+    .errorCode(errorCode),
+    .hasOutstanding(hasOutstanding)
 );
 
 initial begin
@@ -109,35 +120,35 @@ initial begin
         reqAddr=64'hdeadbeef+1;
         `tick(clk);
         `tick(clk);
-        assert(respValid == 1'b1 && respData == 64'h10);
+        assert(pr_r_valid == 1'b1 && respData == 64'h10);
         $display("###### After read HOQ");
         `printPrefetcher(prefetcherData_dut);
     //read existing address - HOQ+1
-        reqAddr=64'hdeadbeef+2;
+    ef+2;
         `tick(clk);
-        assert(respValid == 1'b1 && respData == 64'h20);
+        assert(pr_r_valid == 1'b1 && respData == 64'h20);
         $display("###### After read HOQ+1");
         `printPrefetcher(prefetcherData_dut);
     //read from HOQ-1
-        reqAddr=64'hdeadbeef+1;
+    ef+1;
         `tick(clk);
-        assert(respValid == 1'b0);
+        assert(pr_r_valid == 1'b0);
         $display("###### After read HOQ-1");
         `printPrefetcher(prefetcherData_dut);
     //read from MOQ
-        reqAddr=64'hdeadbeef+4;
+    ef+4;
         `tick(clk);
-        assert(respValid == 1'b0);
+        assert(pr_r_valid == 1'b0);
         $display("###### After read MOQ");
         `printPrefetcher(prefetcherData_dut);
     //read non-existing
-        reqAddr=64'h123;
+    
         `tick(clk);
-        assert(respValid == 1'b0);
+        assert(pr_r_valid == 1'b0);
         $display("###### After read non-existent");
         `printPrefetcher(prefetcherData_dut);
 //invalidate
-        reqOpcode=1; //INVALIDATE
+        reqOpcodeALIDATE
     //normal invalidate
         reqAddr=64'hdeadbeef+3;
         `tick(clk);
@@ -161,11 +172,10 @@ initial begin
         reqOpcode=2; //READ
         reqAddr=64'hdeadbeef+3;
         `tick(clk);
-        assert(respValid == 1'b0);
+        assert(pr_r_valid == 1'b0);
         assert(prefetcherData_dut.headPtr == 3'd2);
         $display("###### After read invalidated + POP");
-        `printPrefetcher(prefetcherData_dut);
-
+        
 //writeReq
         reqOpcode=3; //WRITE_REQ
     //Write till full
