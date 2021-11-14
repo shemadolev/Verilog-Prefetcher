@@ -1,5 +1,5 @@
-/* Module name: prefetcherQueue
- * Description: prefetchQueue is the base module (queue) of a prefetcher. main capabilities:
+/* Module name: prefetcher data path
+ * Description: prefetch data path is the base module (queue) of a prefetcher. main capabilities:
  *              * Stores outstanding requests and data responses from DRAM
  *              * Supports 4 opreations, for each block in the queue, according to 5 opcodes: 
                     0 - NOP ,1 - readReqPref,  2 - readReqMaster(AXI AR/Read Request), 3 - readDataSlave(AXI R/Read Data), 4 - readDataPromise
@@ -50,8 +50,8 @@ logic [0:ADDR_BITS-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block 
 logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, addrIdx;
 logic [0:LOG_QUEUE_SIZE-1] readDataPtr; //Points to next block that readDataSlave writes to 
 logic [0:LOG_QUEUE_SIZE] validCnt;
-logic isEmpty, isFull, dataReady_curBurst, dataReady_nxtBurst;
-logic [0:BURST_LEN_WIDTH-1] burstOffset, //For readDataPromise: Offset inside a burst
+logic isEmpty, isFull, dataReady_curBurst, dataReady_nxtBurst, active;
+logic [0:BURST_LEN_WIDTH-1] burstOffset; //For readDataPromise: Offset inside a burst
 
 //find the valid address index
 findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(ADDR_BITS)) findAddrIdx 
@@ -72,26 +72,27 @@ onesCnt #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE)) numOfValidBlocks
                 );
 
 //vector of 1's for the current burst indices
-vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) headBurstMask
+vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) headBurst_mask
                 (.headIdx(headPtr), .tailIdx(headPtr + reqBurstLen),
                  .outMask(curBurstMask)
                 );
 
 //vector of 1's for the current tail burst
-vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) tailBurstMask
+vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) tailBurst_mask
                 (.headIdx(tailPtr), .tailIdx(tailPtr + reqBurstLen),
                  .outMask(tailBurstMask)
                 );
 
 always_comb begin
+    active = |validVec; //at least one block is valid
     respData = dataMat[headPtr + burstOffset];
     respLast = lastVec[headPtr + burstOffset];
     isFull = (QUEUE_SIZE - validCnt) < reqBurstLen;
     isEmpty = ~|validVec;
-    almostFull = validCnt + (crs_almostFullSpacer * reqBurstLen)  >= QUEUE_SIZE;
+    almostFull = (validCnt + (crs_almostFullSpacer * reqBurstLen)  >= QUEUE_SIZE) & active;
     dataReady_curBurst = (validVec[headPtr + burstOffset] && dataValidVec[headPtr + burstOffset] == 1'b1 && promiseCnt[headPtr] > {(PROMISE_WIDTH){1'b0}});
     dataReady_nxtBurst = (validVec[headPtr + reqBurstLen] && dataValidVec[headPtr + reqBurstLen] == 1'b1 && promiseCnt[headPtr + reqBurstLen] > {(PROMISE_WIDTH){1'b0}});
-    pr_r_valid = dataReady_curBurst || ((promiseCnt[headPtr] == {(PROMISE_WIDTH){1'b0}}) && dataReady_nxtBurst);
+    pr_r_valid = (dataReady_curBurst || ((promiseCnt[headPtr] == {(PROMISE_WIDTH){1'b0}}) && dataReady_nxtBurst)) & active;
     hasOutstanding = |((dataValidVec & validVec) ^ validVec);
 end
 
@@ -101,7 +102,7 @@ always_ff @(posedge clk or negedge resetN)
 begin
 	if(!resetN)	begin 
         validVec <= {QUEUE_SIZE{1'b0}};
-        // dataValidVec <= {QUEUE_SIZE{1'b0}};
+        
         prefetchReqVec <= {QUEUE_SIZE{1'b0}};
         headPtr <= {LOG_QUEUE_SIZE{1'b0}};;
         tailPtr <= {LOG_QUEUE_SIZE{1'b0}};;
@@ -118,6 +119,8 @@ begin
                     validVec <= validVec | tailBurstMask;
                     dataValidVec <= dataValidVec & (~tailBurstMask);
                     prefetchReqVec[tailPtr] <= 1'b1;
+                    addrValid <= addrValid & (~tailBurstMask);
+                    addrValid[tailPtr] <= 1'b1;
                     promiseCnt[tailPtr] <= {(PROMISE_WIDTH){1'b0}};
                     blockAddrMat[tailPtr] <= reqAddr;
                     tailPtr <= tailPtr + reqBurstLen;
@@ -133,10 +136,12 @@ begin
                     promiseCnt[addrIdx] <= promiseCnt[addrIdx] + 1'd1;
                     prefetchReqVec[addrIdx] <= 1'b0;
                 end
-                if(!isFull) begin
+                else if(!isFull) begin
                     validVec <= validVec | tailBurstMask;
                     dataValidVec <= dataValidVec & (~tailBurstMask);
                     prefetchReqVec[tailPtr] <= 1'b0;
+                    addrValid <= addrValid & (~tailBurstMask);
+                    addrValid[tailPtr] <= 1'b1;
                     promiseCnt[tailPtr] <= {{(PROMISE_WIDTH-1){1'b0}},1'b1};
                     blockAddrMat[tailPtr] <= reqAddr;
                     tailPtr <= tailPtr + reqBurstLen;
