@@ -8,8 +8,9 @@ clk=1; \
 $display("------- BEGIN Prefetcher State --------"); \
 $display("  almostFull %b",MOD.almostFull); \
 $display("  errorCode %d",MOD.errorCode); \
-$display("  outstandingReqCnt %d",MOD.outstandingReqCnt); \
+$display("  prefetchReqCnt %d",MOD.prefetchReqCnt); \
 $display("  head:%d tail:%d validCnt:%d isEmpty:%d isFull:%d",MOD.headPtr, MOD.tailPtr, MOD.validCnt, MOD.isEmpty, MOD.isFull); \
+$display("  hasOutstanding:%b pr_r_valid:%b burstOffset:%d readDataPtr:%d",MOD.hasOutstanding, MOD.pr_r_valid, MOD.burstOffset, MOD.readDataPtr); \
 $display(" ** Requset signal **"); \
 $display("   reqDataValid:%d addrHit:%d addrIdx:%d",MOD.reqDataValid, MOD.addrHit, MOD.addrIdx); \
 for(int i=0;i<MOD.QUEUE_SIZE;i++) begin \
@@ -18,6 +19,7 @@ for(int i=0;i<MOD.QUEUE_SIZE;i++) begin \
     $display("  data valid  %d",MOD.dataValidVec[i]); \
     $display("  address     0x%h",MOD.blockAddrMat[i]); \
     $display("  data        0x%h",MOD.dataMat[i]); \
+    $display("  last        0x%h",MOD.lastVec[i]); \
     $display("  outstanding %b",MOD.outstandingReqVec[i]); \
 end \
 $display(" ** Resp data **"); \
