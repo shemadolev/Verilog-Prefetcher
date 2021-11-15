@@ -36,16 +36,16 @@ module prefetcherTop(
     //AXI AW (Write Request) slave port
     input logic s_aw_valid,
     output logic s_aw_ready,
-    input logic [0:BURST_LEN_WIDTH-1]s_aw_len,
-    input logic [0:ADDR_BITS-1] s_aw_addr, 
+    // input logic [0:BURST_LEN_WIDTH-1] s_aw_len,
+    input logic [0:ADDR_BITS-1] s_aw_addr,
     input logic [0:TID_WIDTH-1] s_aw_id,
 
     //AXI AW (Write Request) master port
     output logic m_aw_valid,
     input logic m_aw_ready,
-    output logic [0:BURST_LEN_WIDTH-1] m_aw_len,
-    output logic [0:ADDR_BITS-1] m_aw_addr,
-    output logic [0:TID_WIDTH-1] m_aw_id,
+    // output logic [0:BURST_LEN_WIDTH-1] m_aw_len,
+    // output logic [0:ADDR_BITS-1] m_aw_addr,
+    // output logic [0:TID_WIDTH-1] m_aw_id,
 
     //CR Space
         // Ctrl
@@ -176,10 +176,23 @@ prefetcherCtrl #(
 
 always_comb begin
     prDataPath_resetN = resetN & pr_flush;
-    sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit)) | ctrl_m_ar_valid;
+    //todo When checking (_addr <= limit), _len should also be considered
+    sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit)) | ctrl_m_ar_valid; //todo consider removing the 'cleanup' condition, to enable req's with other IDs
     sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (pr_m_ar_id == m_r_id))) | ctrl_s_r_valid;
     ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & pr_m_ar_id == s_ar_id))) //ReadReq outside limits but same tag
                 | (s_aw_valid & ((s_ar_addr >= bar & s_ar_addr <= limit) | (ctrl_context_valid & pr_m_ar_id == s_ar_id))); //WriteReq in limits or same tag
+
+    s_aw_ready = m_aw_ready;
+    m_aw_valid = s_aw_valid;
+    if(s_aw_valid) begin
+        if ((ctrl_context_valid && pr_m_ar_id == s_aw_id) ||
+            (s_aw_addr >= bar && s_aw_addr <= limit)) begin
+            ctrlFlush = 1'b1;
+            //Block AW channel until cleanup is done
+            s_aw_ready = 1'b0;
+            m_aw_valid = 1'b0;
+        end
+    end
 
     if(sel_ar_pr) begin
         //Path: Master-Prefetcher-Slave
