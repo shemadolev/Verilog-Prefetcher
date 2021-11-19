@@ -192,3 +192,5 @@ begin
 end
 
 endmodule
+
+//todo throw error if getting 'data read' when not expected (validVec[readDataPtr] == 0)
