@@ -182,16 +182,14 @@ always_comb begin
     ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & pr_m_ar_id == s_ar_id))) //ReadReq outside limits but same tag
                 | (s_aw_valid & ((s_aw_addr >= bar & s_aw_addr <= limit) | (ctrl_context_valid & pr_m_ar_id == s_aw_id))); //WriteReq in limits or same tag
 
-    s_aw_ready = m_aw_ready;
-    m_aw_valid = s_aw_valid;
-    if(s_aw_valid) begin
-        if ((ctrl_context_valid && pr_m_ar_id == s_aw_id) ||
-            (s_aw_addr >= bar && s_aw_addr <= limit)) begin
-            ctrlFlush = 1'b1;
-            //Block AW channel until cleanup is done
-            s_aw_ready = 1'b0;
-            m_aw_valid = 1'b0;
-        end
+    if(s_aw_valid && ctrl_context_valid && ((pr_m_ar_id == s_aw_id) || (s_aw_addr >= bar && s_aw_addr <= limit))) begin
+        ctrlFlush = 1'b1; //This stops the controller from sending ar_ready=1 to the master
+        //Block AW channel until cleanup is done
+        s_aw_ready = 1'b0;
+        m_aw_valid = 1'b0;
+    end else begin
+        s_aw_ready = m_aw_ready;
+        m_aw_valid = s_aw_valid;
     end
 
     if(sel_ar_pr) begin
