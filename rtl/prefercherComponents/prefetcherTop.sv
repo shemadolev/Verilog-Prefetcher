@@ -180,7 +180,7 @@ always_comb begin
     sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit)) | ctrl_m_ar_valid; //todo consider removing the 'cleanup' condition, to enable req's with other IDs
     sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (pr_m_ar_id == m_r_id))) | ctrl_s_r_valid;
     ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & pr_m_ar_id == s_ar_id))) //ReadReq outside limits but same tag
-                | (s_aw_valid & ((s_ar_addr >= bar & s_ar_addr <= limit) | (ctrl_context_valid & pr_m_ar_id == s_ar_id))); //WriteReq in limits or same tag
+                | (s_aw_valid & ((s_aw_addr >= bar & s_aw_addr <= limit) | (ctrl_context_valid & pr_m_ar_id == s_aw_id))); //WriteReq in limits or same tag
 
     s_aw_ready = m_aw_ready;
     m_aw_valid = s_aw_valid;
