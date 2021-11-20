@@ -64,7 +64,6 @@ logic pr_almostFull;
 logic [0:LOG_QUEUE_SIZE] prefetchReqCnt;
 logic pr_r_valid;
 logic pr_r_in_last;
-logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data;
 logic pr_addrHit;
 logic pr_hasOutstanding;
 logic [0:2] pr_opCode;
@@ -89,7 +88,6 @@ logic [0:TID_WIDTH-1] ctrl_m_ar_id;
 logic ctrl_s_r_valid;
 logic ctrl_s_r_ready;
 logic ctrl_s_r_last;
-logic [0:BLOCK_DATA_SIZE_BITS-1] ctrl_s_r_data;
 logic [0:TID_WIDTH-1] ctrl_s_r_id;
 logic ctrl_m_r_valid;
 logic ctrl_m_r_ready;
@@ -140,7 +138,6 @@ prefetcherCtrl #(
     .prefetchReqCnt(prefetchReqCnt), 
     .pr_r_valid(pr_r_valid), 
     .pr_r_in_last(pr_r_in_last), 
-    .pr_r_in_data(pr_r_in_data), 
     .pr_addrHit(pr_addrHit), 
     .pr_hasOutstanding(pr_hasOutstanding), 
     .pr_m_ar_addr(pr_m_ar_addr), 
@@ -163,7 +160,6 @@ prefetcherCtrl #(
     .s_r_valid(ctrl_s_r_valid), 
     .s_r_ready(ctrl_s_r_ready), 
     .s_r_last(ctrl_s_r_last), 
-    .s_r_data(ctrl_s_r_data), 
     .s_r_id(ctrl_s_r_id), 
     .m_r_valid(ctrl_m_r_valid), 
     .m_r_ready(ctrl_m_r_ready),
