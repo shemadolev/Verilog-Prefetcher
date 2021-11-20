@@ -117,23 +117,6 @@ module prefetcherDataTb ();
         `tick(clk);
         assert(errorCode == 3'd3);
 
-    //readDataSlave
-        reqData=64'h0;
-        reqOpcode=3; 
-        for (int i=0; i<3;i++) begin //One extra write response
-            for(int j=0; j<reqBurstLen-1;j++) begin
-                reqLast=1'b0;
-                reqData+=64'h10;
-                `tick(clk);
-            end
-            reqData+=64'h10;
-            reqLast=1'b1;
-            `tick(clk);
-            $display("###### After read_data_DDR (%d/5)", i+1);
-            `printPrefetcher(prefetcherData_dut);
-            assert(pr_r_valid == 1'b1); //verify that the data path inform the controller that there is data that can be sent to NVDLA
-        end
-        assert(hasOutstanding == 1'b0);
 
     //readReqPref
         reqAddr=64'hdeadbeef + 64'h5;
@@ -149,6 +132,25 @@ module prefetcherDataTb ();
         assert(almostFull == 1'b1);
 
 
+    //readDataSlave
+        reqData=64'h0;
+        reqOpcode=3; 
+        for (int i=0; i<4;i++) begin //One extra write response
+            for(int j=0; j<reqBurstLen-1;j++) begin
+                reqLast=1'b0;
+                reqData+=64'h10;
+                `tick(clk);
+            end
+            reqData+=64'h10;
+            reqLast=1'b1;
+            `tick(clk);
+            $display("###### After read_data_DDR (%d/4)", i+1);
+            `printPrefetcher(prefetcherData_dut);
+            assert(pr_r_valid == 1'b1); //verify that the data path inform the controller that there is data that can be sent to NVDLA
+        end
+        assert(hasOutstanding == 1'b1);
+
+
     //readDataPromise
         while (pr_r_valid == 1'b1) begin
             reqOpcode=4; 
@@ -156,9 +158,7 @@ module prefetcherDataTb ();
             $display("###### After read_data_NVDLA");
             `printPrefetcher(prefetcherData_dut);
         end
-    
-    //TODO continue here
-
+        assert(prefetchReqCnt == 2);
 
     //readReqMaster - request the prefetched addresses
         reqAddr=64'hdeadbeef + 64'h5;
