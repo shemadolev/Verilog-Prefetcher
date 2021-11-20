@@ -4,41 +4,31 @@ clk=0; \
 clk=1; \
 #1
 
-`define printState(MOD) \
-$display("------- BEGIN Prefetcher State --------"); \
-$display("  almostFull %b",MOD.almostFull); \
-$display("  errorCode %d",MOD.errorCode); \
-$display("  prefetchReqCnt %d",MOD.prefetchReqCnt); \
-$display("  head:%d tail:%d validCnt:%d isEmpty:%d isFull:%d",MOD.headPtr, MOD.tailPtr, MOD.validCnt, MOD.isEmpty, MOD.isFull); \
-$display("  hasOutstanding:%b burstOffset:%d readDataPtr:%d",MOD.hasOutstanding, MOD.burstOffset, MOD.readDataPtr); \
-$display(" ** Requset signal **"); \
-$display("   addrHit:%d addrIdx:%d", MOD.addrHit, MOD.addrIdx); \
-for(int i=0;i<MOD.QUEUE_SIZE;i++) begin \
-    $display("--Block           %d ",i); \
-    $display("  valid           %d",MOD.validVec[i]); \
-    $display("  addrValid       %b",MOD.addrValid[i]); \
-    $display("  address         0x%h",MOD.blockAddrMat[i]); \
-    $display("  data valid      %d",MOD.dataValidVec[i]); \
-    $display("  data            0x%h",MOD.dataMat[i]); \
-    $display("  last            0x%h",MOD.lastVec[i]); \
-    $display("  prefetchReqVec  %b",MOD.prefetchReqVec[i]); \
-    $display("  promiseCnt      %d",MOD.promiseCnt[i]); \
+`define printContext(MOD) \
+$display("------- BEGIN Prefetcher Context --------"); \
+$display("  st_pr_cur %d",MOD.st_pr_cur); \
+$display("  st_exec_cur %d",MOD.st_exec_cur); \
+$display("  pr_context_valid %b",MOD.pr_context_valid); \
+if(pr_context_valid == 1) begin \
+    $display("  bar 0x%h, limit 0x%h",MOD.bar, MOD.limit); \
+    $display("  pr_m_ar_len %d",MOD.pr_m_ar_len); \
+    $display("  pr_m_ar_id %d",MOD.pr_m_ar_id); \
+    $display("  stride_reg %d",MOD.stride_reg); \
+    $display("  prefetchAddr_valid %d",MOD.prefetchAddr_valid); \
+    if(MOD.prefetchAddr_valid) \
+        $display("  prefetchAddr_reg %d",MOD.prefetchAddr_reg); \
 end \
-$display(" ** Resp data **"); \
-$display(" pr_r_valid:%b respData:0x%h respLast:%b", MOD.pr_r_valid, MOD.respData, MOD.respLast); \
-$display("------- END Prefetcher State --------")
+$display("------- END Prefetcher Context --------")
 
 
-module prefetcherCtrl();
+module prefetcherCtrl_tb();
     localparam ADDR_BITS = 64; //64bit address 2^64
     localparam LOG_QUEUE_SIZE = 3'd6; // the size of the queue [2^x] 
     localparam WATCHDOG_SIZE = 10'd10; // number of bits for the watchdog counter
-    localparam LOG_BLOCK_DATA_BYTES = 3'd6; //[Bytes]
     localparam BURST_LEN_WIDTH = 4'd8; //NVDLA max is 3; AXI4 supports up to 8 bits
-    localparam TID_WIDTH = 4'd8 //NVDLA max is 3; AXI4 supports up to 8 bits
+    localparam TID_WIDTH = 4'd8; //NVDLA max is 3; AXI4 supports up to 8 bits
 
-    localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3; //shift left by 3 to convert Bytes->bits
-
+    
     logic     clk;
     logic     en;
     logic     resetN;
@@ -57,7 +47,6 @@ module prefetcherCtrl();
        // Read channel
      logic     pr_r_valid;
      logic     pr_r_in_last;
-     logic     [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data;
         //Read Req Channel
      logic    [0:ADDR_BITS-1] pr_m_ar_addr;
      logic    [0:BURST_LEN_WIDTH-1] pr_m_ar_len;
@@ -74,7 +63,6 @@ module prefetcherCtrl();
      logic s_r_valid;
      logic s_r_ready;
      logic s_r_last;
-     logic [0:BLOCK_DATA_SIZE_BITS-1] s_r_data;
      logic [0:TID_WIDTH-1] s_r_id;
 
     // Master AXI ports (PR <-> DDR)
@@ -93,14 +81,13 @@ module prefetcherCtrl();
      logic     [0:ADDR_BITS-1] bar;
      logic     [0:ADDR_BITS-1] limit;
      logic     [0:LOG_QUEUE_SIZE] windowSize;
-     logic     [0:WATCHDOG_SIZE-1] watchdogCnt //the size of the counter that is used to divide the clk freq for the watchdog
+     logic     [0:WATCHDOG_SIZE-1] watchdogCnt; //the size of the counter that is used to divide the clk freq for the watchdog
 
 
     prefetcherCtrl #(
         .ADDR_BITS(ADDR_BITS),
         .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
         .WATCHDOG_SIZE(WATCHDOG_SIZE),
-        .LOG_BLOCK_DATA_BYTES(LOG_BLOCK_DATA_BYTES),
         .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
         .TID_WIDTH(TID_WIDTH)
     ) prefetcherCtrl_dut (
@@ -118,7 +105,6 @@ module prefetcherCtrl();
         .pr_context_valid(pr_context_valid), // burst & tag were learned
         .pr_r_valid(pr_r_valid),
         .pr_r_in_last(pr_r_in_last),
-        .pr_r_in_data(pr_r_in_data),
         .pr_m_ar_addr(pr_m_ar_addr),
         .pr_m_ar_len(pr_m_ar_len),
         .pr_m_ar_id(pr_m_ar_id),
@@ -130,7 +116,6 @@ module prefetcherCtrl();
         .s_r_valid(s_r_valid),
         .s_r_ready(s_r_ready),
         .s_r_last(s_r_last),
-        .s_r_data(s_r_data),
         .s_r_id(s_r_id),
         .m_ar_valid(m_ar_valid),
         .m_ar_ready(m_ar_ready),
@@ -147,14 +132,63 @@ module prefetcherCtrl();
     );
 
     initial begin
+        localparam BASE_ADDR = 64'hdeadbeef;
         resetN=0;
-        crs_almostFullSpacer=2;
+        ctrlFlush=0;
 
         `tick(clk);
-        $display("###### Reseted prefetcher");
+        `printContext(prefetcherCtrl_dut);
         resetN=1;
-        `printPrefetcher(prefetcherData_dut);
-        reqBurstLen=1; 
+        en=1;
+        bar = 0;
+        limit = BASE_ADDR * 2;
+        $display("###### Reseted prefetcher");
+
+        s_ar_valid = 1'b1;
+        s_ar_len = 4;
+        s_ar_id = 3;
+        pr_almostFull = 0;
+        m_ar_ready = 1;
+        
+        pr_addrHit = 0;
+        for (int i=0; i<3; i++) begin
+            s_ar_addr = BASE_ADDR + i*64;
+            #1;
+            $display("  s_ar_ready_next %b",prefetcherCtrl_dut.s_ar_ready_next);
+            `tick(clk); //ST_EXEC_IDLE (raise ready)
+            #1;
+            $display("###### 1");
+            $display("  s_ar_ready_next %b",prefetcherCtrl_dut.s_ar_ready_next);
+            `printContext(prefetcherCtrl_dut);
+            #1;
+            $display("  shouldCleanup %b",prefetcherCtrl_dut.shouldCleanup);
+            assert(s_ar_ready == 1);
+            `tick(clk); //ST_EXEC_IDLE -> ST_EXEC_S_AR_PR_ACCESS
+            $display("###### 2");
+            #1;
+            `printContext(prefetcherCtrl_dut);
+            $display("  shouldCleanup %b",prefetcherCtrl_dut.shouldCleanup);
+            assert(pr_opCode == 2); //read req to data path
+            assert(s_ar_ready == 0);
+            #1;
+            `tick(clk); //ST_EXEC_S_AR_PR_ACCESS -> ST_EXEC_S_AR_POLLING
+            $display("###### 3");
+            #1;
+            `printContext(prefetcherCtrl_dut);
+            $display("  shouldCleanup %b",prefetcherCtrl_dut.shouldCleanup);
+            assert(m_ar_valid == 1);
+            #1;
+            `tick(clk); // ST_EXEC_S_AR_POLLING -> ST_EXEC_IDLE
+            assert(m_ar_valid == 0);
+            $display("###### 4");
+            `printContext(prefetcherCtrl_dut);
+            #1;
+            $display("  shouldCleanup %b",prefetcherCtrl_dut.shouldCleanup);
+        end
+
+        s_ar_valid = 0;
+
+        
     $display("**** All tests passed ****");
     
         $stop;
