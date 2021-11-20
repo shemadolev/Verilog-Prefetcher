@@ -15,14 +15,24 @@ $display(" ** Requset signal **"); \
 $display("   addrHit:%d addrIdx:%d", MOD.addrHit, MOD.addrIdx); \
 for(int i=0;i<MOD.QUEUE_SIZE;i++) begin \
     $display("--Block           %d ",i); \
+    if(MOD.headPtr == i) \
+        $display(" ^^^ HEAD ^^^"); \
+    if(MOD.tailPtr == i) \
+        $display(" ^^^ TAIL ^^^"); \
     $display("  valid           %d",MOD.validVec[i]); \
-    $display("  addrValid       %b",MOD.addrValid[i]); \
-    $display("  address         0x%h",MOD.blockAddrMat[i]); \
-    $display("  data valid      %d",MOD.dataValidVec[i]); \
-    $display("  data            0x%h",MOD.dataMat[i]); \
-    $display("  last            0x%h",MOD.lastVec[i]); \
-    $display("  prefetchReqVec  %b",MOD.prefetchReqVec[i]); \
-    $display("  promiseCnt      %d",MOD.promiseCnt[i]); \
+    if(MOD.validVec[i]) begin \
+        $display("  addrValid       %b",MOD.addrValid[i]); \
+        if(MOD.addrValid[i]) begin \
+            $display("  address         0x%h",MOD.blockAddrMat[i]); \
+            $display("  prefetchReq     %b",MOD.prefetchReqVec[i]); \
+            $display("  promiseCnt      %d",MOD.promiseCnt[i]); \
+        end \
+        $display("  data valid      %d",MOD.dataValidVec[i]); \
+        if(MOD.dataValidVec[i]) begin \
+            $display("  data            0x%h",MOD.dataMat[i]); \
+            $display("  last            0x%h",MOD.lastVec[i]); \
+        end \
+    end \
 end \
 $display(" ** Resp data **"); \
 $display(" pr_r_valid:%b respData:0x%h respLast:%b", MOD.pr_r_valid, MOD.respData, MOD.respLast); \
@@ -163,7 +173,7 @@ module prefetcherDataTb ();
     //readReqMaster - request the prefetched addresses
         reqAddr=64'hdeadbeef + 64'h5;
         reqOpcode=2;
-        for (int i=5; i<7;i++) begin
+        for (int i=3; i<5;i++) begin
             reqAddr+=1;
             #1;
             `tick(clk);
@@ -183,6 +193,69 @@ module prefetcherDataTb ();
             `printPrefetcher(prefetcherData_dut);
         end
 
+    //readReqPref
+        reqAddr=64'hdeadbef6;
+        reqOpcode=1;
+        for (int i=0; i<2;i++) begin
+            reqAddr+=1;
+            #1;
+            `tick(clk);
+        end
+        $display("###### After prefetching 2 addresses");
+        `printPrefetcher(prefetcherData_dut);
+        assert(hasOutstanding == 1'b1);
+
+
+    $display("Phase 2");
+
+    //readReqMaster - request the prefetched addresses + new one
+        reqAddr=64'hdeadbef6;
+        reqOpcode=2;
+        for (int i=0; i<3;i++) begin
+            reqAddr+=1;
+            #1;
+            if(i < 2)
+                assert(addrHit == 1'b1);
+            else
+                assert(addrHit == 1'b0);
+            #1;
+            `tick(clk);
+            $display("###### After requesting address 0x%h", reqAddr);
+            `printPrefetcher(prefetcherData_dut);
+        end
+        $display("###### After requesting the prefetched addresses + new one");
+        `printPrefetcher(prefetcherData_dut);
+        assert(prefetchReqCnt == 0); //no unrequested addresses at this point
+
+
+    //readDataSlave
+        reqData=64'h500;
+        reqOpcode=3; 
+        for (int i=0; i<3;i++) begin //One extra write response
+            for(int j=0; j<reqBurstLen-1;j++) begin
+                reqLast=1'b0;
+                reqData+=64'h10;
+                `tick(clk);
+            end
+            reqData+=64'h10;
+            reqLast=1'b1;
+            `tick(clk);
+            $display("###### After read_data_DDR (%d/3)", i+1);
+            `printPrefetcher(prefetcherData_dut);
+            assert(pr_r_valid == 1'b1); //verify that the data path inform the controller that there is data that can be sent to NVDLA
+        end
+        assert(hasOutstanding == 1'b1);
+
+
+    //readDataPromise - with promiseCnt>1
+        while (pr_r_valid == 1'b1) begin
+            reqOpcode=4; 
+            `tick(clk);
+        end
+        $display("###### After read_data_NVDLA");
+        `printPrefetcher(prefetcherData_dut);
+
+
     //Flush & different burst
         resetN=0;
         crs_almostFullSpacer=2;
@@ -197,8 +270,4 @@ module prefetcherDataTb ();
     
         $stop;
     end
-
-
 endmodule
-
-//todo add: WriteReq & check almostFull, and error when full

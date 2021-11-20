@@ -48,7 +48,6 @@ module prefetcherDataTb ();
 
     //CRS
     logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer; 
-    //TODO input the actual requested size of block
 
     //local
     logic   pr_r_valid;
@@ -164,16 +163,9 @@ module prefetcherDataTb ();
         $display("###### After requesting the prefetched addresses (twice for each)");
         `printPrefetcher(prefetcherData_dut);
         assert(prefetchReqCnt == 0); //no unrequested addresses at this point
+        assert(pr_r_valid == 1'b1);
 
-    //readDataPromise - with promiseCnt>1
-        while (pr_r_valid == 1'b1) begin
-            reqOpcode=4; 
-            `tick(clk);
-            $display("###### After read_data_NVDLA");
-            `printPrefetcher(prefetcherData_dut);
-        end
-
-    //Flush & different burst
+    //Flush 
         resetN=0;
         crs_almostFullSpacer=2;
 
@@ -181,7 +173,6 @@ module prefetcherDataTb ();
         $display("###### Reseted prefetcher");
         resetN=1;
         `printPrefetcher(prefetcherData_dut);
-        reqBurstLen=3;
 
     $display("**** All tests passed ****");
     
@@ -189,5 +180,3 @@ module prefetcherDataTb ();
     end
 
 endmodule
-
-//todo add: WriteReq & check almostFull, and error when full
