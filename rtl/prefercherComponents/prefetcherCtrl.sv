@@ -90,6 +90,7 @@ logic [0:BLOCK_DATA_SIZE_BITS-1] s_r_data_next;
 //watchdog
 logic watchdogHit;
 logic watchdogHit_d;
+logic st_exec_changed;
 
 // Watchdog
 clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
@@ -112,10 +113,12 @@ always_ff @(posedge clk or negedge resetN) begin
 	end
 	else begin
         if(en) begin
-            if (watchdogHit && !watchdogHit_d) begin
-                // watchdog description: ToBit += 1 every watchdog rise. Resets on any read request / response. When reaches max value, flush all.
+            // watchdog description: ToBit += 1 every watchdog rise. Resets on any state change of the EXEC FSM. When reaches max value, flush all.
+            if(st_exec_changed)
+                ToBit <= 1'b0;
+            else if (watchdogHit && !watchdogHit_d)
                 ToBit <= ~ToBit;
-            end
+
             s_ar_addr_prev <= s_ar_addr;
             
             st_pr_cur <= st_pr_next;
@@ -312,5 +315,6 @@ assign strideMiss = (stride_reg != stride_sampled) && !zeroStride;
 assign shouldCleanup = (s_ar_valid && (((s_ar_id != pr_m_ar_id | s_ar_len != pr_m_ar_len) && rangeHit) || (!rangeHit && pr_m_ar_id == s_ar_id)))
                         || strideMiss || ctrlFlush;
 assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
+assign st_exec_changed = st_exec_cur != st_exec_next;
 
 endmodule
