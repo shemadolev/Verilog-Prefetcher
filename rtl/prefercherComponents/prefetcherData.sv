@@ -85,7 +85,7 @@ vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) tailBurst_mask
 
 always_comb begin
     active = |validVec; //at least one block is valid
-    respData = dataMat[headPtr + burstOffset];
+    respData = dataReady_curBurst ? dataMat[headPtr + burstOffset] : dataMat[headPtr + reqBurstLen + burstOffset]; //Pass data in head/head+1, based on promise&dataValid of head
     respLast = lastVec[headPtr + burstOffset];
     isFull = (QUEUE_SIZE - validCnt) < reqBurstLen;
     isEmpty = ~|validVec;
