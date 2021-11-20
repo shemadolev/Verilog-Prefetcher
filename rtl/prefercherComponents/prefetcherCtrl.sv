@@ -219,13 +219,18 @@ always_comb begin
     m_r_ready_next = 1'b0;
     pr_ar_ack_next = 1'b0;
 
+    //todo add timout counter for EXEC
+
     case (st_exec_cur)
         ST_EXEC_IDLE: begin 
-            if(s_ar_valid & ~shouldCleanup & |(st_pr_cur ^ ST_PR_CLEANUP)) begin
-                if(s_ar_ready) begin
+
+            if((s_ar_valid & s_ar_ready) | (s_ar_valid & ~shouldCleanup & |(st_pr_cur ^ ST_PR_CLEANUP) & ~pr_almostFull)) begin
+                if(s_ar_valid & s_ar_ready) begin
                     pr_opCode_next = 3'd2; //readReqMaster
                     pr_m_ar_addr_next = s_ar_addr;
+                    s_ar_ready_next = 1'b0;
 
+                    //Create read req' PR->DDR
                     m_ar_len_next = s_ar_len;
                     m_ar_id_next = s_ar_id;
                     m_ar_addr_next = s_ar_addr;
@@ -249,7 +254,7 @@ always_comb begin
                         m_r_ready_next = 1'b1;
                 end
             end
-            else if (prefetchAddr_valid & ~shouldCleanup) begin
+            else if (prefetchAddr_valid & ~shouldCleanup & ~pr_almostFull) begin
                 pr_ar_ack_next = 1'b1;
                 pr_opCode_next = 3'd1; //readReqPref
                 pr_m_ar_addr_next = prefetchAddr_reg;
