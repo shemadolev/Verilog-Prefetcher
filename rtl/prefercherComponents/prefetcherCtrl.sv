@@ -4,8 +4,6 @@ module prefetcherCtrl #(
     parameter ADDR_BITS = 64, //64bit address 2^64
     parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
     parameter WATCHDOG_SIZE = 10'd10, // number of bits for the watchdog counter
-    parameter LOG_BLOCK_DATA_BYTES = 3'd6, //[Bytes]
-    localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3, //shift left by 3 to convert Bytes->bits
     parameter BURST_LEN_WIDTH = 4'd8, //NVDLA max is 3, AXI4 supports up to 8 bits
     parameter TID_WIDTH = 4'd8 //NVDLA max is 3, AXI4 supports up to 8 bits
 )(
@@ -27,7 +25,6 @@ module prefetcherCtrl #(
        // Read channel
     input logic     pr_r_valid,
     input logic     pr_r_in_last,
-    input logic     [0:BLOCK_DATA_SIZE_BITS-1] pr_r_in_data,
         //Read Req Channel
     output logic    [0:ADDR_BITS-1] pr_m_ar_addr,
     output logic    [0:BURST_LEN_WIDTH-1] pr_m_ar_len,
@@ -44,7 +41,6 @@ module prefetcherCtrl #(
     output logic s_r_valid,
     input logic s_r_ready,
     output logic s_r_last,
-    output logic [0:BLOCK_DATA_SIZE_BITS-1] s_r_data,
     output logic [0:TID_WIDTH-1] s_r_id,
 
     // Master AXI ports (PR <-> DDR)
@@ -69,23 +65,28 @@ module prefetcherCtrl #(
 // Slice's context
 logic   [0:ADDR_BITS-1] stride_sampled, stride_reg, stride_next;
 logic   [0:TID_WIDTH-1] pr_m_ar_id_next;
-logic   [0:BURST_LEN_WIDTH-1] pr_m_ar_len, pr_m_ar_len_next;
+logic   [0:BURST_LEN_WIDTH-1] pr_m_ar_len_next;
 
 // Slice's learning 
 logic   [0:ADDR_BITS-1] s_ar_addr_prev;
 logic   [0:ADDR_BITS-1] prefetchAddr_reg, prefetchAddr_next; //The address that should be prefetched
 
 // Control bits
-logic   reqValid, strideMiss, pr_flush_next, pr_ar_ack_next, rangeHit;
+logic   reqValid, strideMiss, pr_flush_next, pr_ar_ack, pr_ar_ack_next, rangeHit;
+logic   shouldCleanup, shouldCleanup_inRange, shouldCleanup_outRange;
 logic   slaveReady_next, prefetchAddrInRange, zeroStride, ToBit, prefetchAddr_valid, prefetchAddr_valid_next;
 logic   [0:2] pr_opCode_next;
+
 logic   [0:ADDR_BITS-1] pr_m_ar_addr_next;
 logic   [0:BURST_LEN_WIDTH-1] m_ar_len_next;
 logic   [0:ADDR_BITS-1] m_ar_addr_next;
 logic   [0:TID_WIDTH-1] m_ar_id_next;
 
+logic m_r_ready_next, m_ar_valid_next;
+
 logic s_r_valid_next, s_r_in_last_next;
-logic [0:BLOCK_DATA_SIZE_BITS-1] s_r_data_next;
+
+logic s_ar_ready_next;
 
 //watchdog
 logic watchdogHit;
@@ -94,13 +95,13 @@ logic st_exec_changed;
 
 // Watchdog
 clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
-            (.clk(clk), .resetN(resetN), .preScaleValue(watchdogCnt)
+            (.clk(clk), .resetN(resetN), .preScaleValue(watchdogCnt),
              .slowEnPulse(watchdogHit), .slowEnPulse_d(watchdogHit_d)
             );
 
 //FSM States
 enum logic [1:0] {ST_PR_IDLE, ST_PR_ARM, ST_PR_ACTIVE, ST_PR_CLEANUP} st_pr_cur, st_pr_next;
-enum logic [1:0] {ST_EXEC_IDLE,ST_EXEC_S_AR_POLLING,ST_EXEC_PR_AR_POLLING,ST_EXEC_S_R_POLLING} st_exec_cur, st_exec_next;
+enum logic [2:0] {ST_EXEC_IDLE, ST_EXEC_S_AR_PR_ACCESS, ST_EXEC_S_AR_POLLING, ST_EXEC_S_R_POLLING, ST_EXEC_PR_AR_POLLING} st_exec_cur, st_exec_next;
 
 always_ff @(posedge clk or negedge resetN) begin
 	if(!resetN || (watchdogHit && !watchdogHit_d && ToBit==1'b1)) begin
@@ -138,13 +139,13 @@ always_ff @(posedge clk or negedge resetN) begin
             
             s_ar_ready <= s_ar_ready_next;
 
+            m_ar_valid <= m_ar_valid_next;
             m_ar_len <= m_ar_len_next;
             m_ar_addr <= m_ar_addr_next;
             m_ar_id <= m_ar_id_next;
 
             s_r_valid <= s_r_valid_next;
             s_r_last <= s_r_in_last_next;
-            s_r_data <= s_r_data_next;
             
             pr_ar_ack <= pr_ar_ack_next;
 
@@ -172,7 +173,7 @@ always_comb begin
             end
         end
         ST_PR_ARM: begin
-            if(shouldCleanup) begin
+            if(shouldCleanup == 1'b1) begin
                 st_pr_next = ST_PR_CLEANUP;
             end
             else if(rangeHit && !zeroStride) begin
@@ -194,7 +195,7 @@ always_comb begin
             end
         end
         ST_PR_CLEANUP: begin
-            if(~pr_r_valid & ~hasOutstanding) begin
+            if(~pr_r_valid & ~pr_hasOutstanding) begin
                 st_pr_next = ST_PR_IDLE;
                 pr_flush_next = 1'b1;
             end
@@ -204,6 +205,8 @@ end
 
 //Execution FSM comb' logic
 always_comb begin
+    st_exec_next = st_exec_cur;
+    
     pr_opCode_next = 3'd0; //NOP
     s_ar_ready_next = 1'b0;
     pr_m_ar_addr_next = pr_m_ar_addr;
@@ -215,7 +218,6 @@ always_comb begin
     
     s_r_valid_next = 1'b0;
     s_r_in_last_next = s_r_last;
-    s_r_data_next = s_r_data;
 
     s_r_id = pr_m_ar_id;
 
@@ -227,7 +229,7 @@ always_comb begin
     case (st_exec_cur)
         ST_EXEC_IDLE: begin 
 
-            if((s_ar_valid & s_ar_ready) | (s_ar_valid & ~shouldCleanup & |(st_pr_cur ^ ST_PR_CLEANUP) & ~pr_almostFull)) begin
+            if((s_ar_valid & s_ar_ready) | (s_ar_valid & ~shouldCleanup & (st_pr_cur != ST_PR_CLEANUP) & ~pr_almostFull)) begin
                 if(s_ar_valid & s_ar_ready) begin
                     pr_opCode_next = 3'd2; //readReqMaster
                     pr_m_ar_addr_next = s_ar_addr;
@@ -245,7 +247,6 @@ always_comb begin
             else if (pr_r_valid) begin
                 s_r_valid_next = 1'b1;
                 s_r_in_last_next = pr_r_in_last;
-                s_r_data_next = pr_r_data;
                 pr_opCode_next = 3'd4; //readDataPromise
                 st_exec_next = ST_EXEC_S_R_POLLING;
             end
@@ -271,6 +272,23 @@ always_comb begin
             end
         end
 
+        ST_EXEC_S_AR_PR_ACCESS: begin
+            if(pr_addrHit) //TODO check on which clk addrHit raises
+                st_exec_next = ST_EXEC_IDLE;
+            else begin
+                m_ar_valid_next = 1'b1;
+                st_exec_next = ST_EXEC_S_AR_POLLING;
+            end
+        end
+        
+        ST_EXEC_S_AR_POLLING: begin
+            if(m_ar_ready & m_ar_valid) begin
+                m_ar_valid_next = 1'b0;
+                st_exec_next = ST_EXEC_IDLE;
+            end else
+                m_ar_valid_next = 1'b1;
+        end
+
         ST_EXEC_S_R_POLLING: begin
             s_r_valid_next = 1'b1;
             if(s_r_ready) begin
@@ -287,22 +305,7 @@ always_comb begin
             end
         end
 
-        ST_EXEC_S_AR_PR_ACCESS: begin
-            if(pr_addrHit) //TODO check on which clk addrHit raises
-                st_exec_next = ST_EXEC_IDLE;
-            else begin
-                m_ar_valid_next = 1'b1;
-                st_exec_next = ST_EXEC_S_AR_POLLING;
-            end
-        end
 
-        ST_EXEC_S_AR_POLLING: begin
-            if(m_ar_ready & m_ar_valid) begin
-                m_ar_valid_next = 1'b0;
-                st_exec_next = ST_EXEC_IDLE;
-            end else
-                m_ar_valid_next = 1'b1;
-        end
     endcase
 end
 
@@ -311,10 +314,13 @@ assign stride_sampled = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles cor
 assign zeroStride = (stride_sampled == {ADDR_BITS{1'b0}});
 assign rangeHit = s_ar_valid && (s_ar_addr >= bar) && (s_ar_addr <= limit);
 assign prefetchAddrInRange = (prefetchAddr_reg >= bar) && (prefetchAddr_reg <= limit);
-assign strideMiss = (stride_reg != stride_sampled) && !zeroStride;
-assign shouldCleanup = (s_ar_valid && (((s_ar_id != pr_m_ar_id | s_ar_len != pr_m_ar_len) && rangeHit) || (!rangeHit && pr_m_ar_id == s_ar_id)))
-                        || strideMiss || ctrlFlush;
+assign strideMiss = (stride_reg != stride_sampled) && !zeroStride && pr_context_valid;
+assign shouldCleanup = (s_ar_valid & pr_context_valid & (shouldCleanup_inRange | shouldCleanup_outRange))
+                        | strideMiss | ctrlFlush;
+assign shouldCleanup_inRange = (s_ar_id != pr_m_ar_id | s_ar_len != pr_m_ar_len) && rangeHit;
+assign shouldCleanup_outRange = (!rangeHit && pr_m_ar_id == s_ar_id);
 assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
 assign st_exec_changed = st_exec_cur != st_exec_next;
+// TODO pr_almostFull musk 'x' value of first cycle
 
 endmodule
