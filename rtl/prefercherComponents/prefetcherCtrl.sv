@@ -189,11 +189,11 @@ always_comb begin
                 st_pr_next = ST_PR_CLEANUP;
             end else begin
                 if (m_ar_valid & m_ar_ready)
+                    prefetchAddr_next = m_ar_addr + stride_reg;
+
                 if((pr_reqCnt < windowSize) && ~pr_almostFull && prefetchAddrInRange) //Should fetch next block
                     prefetchAddr_valid_next = 1'b1; 
-                 
-                if(pr_ar_ack) 
-                    prefetchAddr_next = prefetchAddr_reg + stride_reg;
+
             end
         end
         ST_PR_CLEANUP: begin
