@@ -119,8 +119,9 @@ always_ff @(posedge clk or negedge resetN) begin
                 ToBit <= 1'b0;
             else if (watchdogHit && !watchdogHit_d)
                 ToBit <= ~ToBit;
-
-            s_ar_addr_prev <= s_ar_addr;
+            
+            if(s_ar_valid & s_ar_ready)
+                s_ar_addr_prev <= s_ar_addr;
             
             st_pr_cur <= st_pr_next;
             st_exec_cur <= st_exec_next;
@@ -166,17 +167,17 @@ always_comb begin
 
     case (st_pr_cur)
         ST_PR_IDLE: begin
-            if(rangeHit) begin
+            if(s_ar_valid & s_ar_ready) begin
                 st_pr_next = ST_PR_ARM;
                 pr_m_ar_len_next = s_ar_len;
                 pr_m_ar_id_next = s_ar_id;
             end
         end
         ST_PR_ARM: begin
-            if(shouldCleanup == 1'b1) begin
+            if(shouldCleanup) begin
                 st_pr_next = ST_PR_CLEANUP;
             end
-            else if(rangeHit && !zeroStride) begin
+            else if(s_ar_valid & s_ar_ready & ~zeroStride) begin
                 st_pr_next = ST_PR_ACTIVE;
                 stride_next = stride_sampled;
                 prefetchAddr_next = s_ar_addr + stride_sampled;
@@ -187,6 +188,7 @@ always_comb begin
             if(shouldCleanup) begin
                 st_pr_next = ST_PR_CLEANUP;
             end else begin
+                if (m_ar_valid & m_ar_ready)
                 if((pr_reqCnt < windowSize) && ~pr_almostFull && prefetchAddrInRange) //Should fetch next block
                     prefetchAddr_valid_next = 1'b1; 
                  
