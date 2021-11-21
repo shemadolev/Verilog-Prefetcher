@@ -72,8 +72,8 @@ logic   [0:ADDR_BITS-1] s_ar_addr_prev;
 logic   [0:ADDR_BITS-1] prefetchAddr_reg, prefetchAddr_next; //The address that should be prefetched
 
 // Control bits
-logic   reqValid, strideMiss, pr_flush_next, pr_ar_ack, pr_ar_ack_next, rangeHit;
-logic   shouldCleanup, shouldCleanup_inRange, shouldCleanup_outRange;
+logic   reqValid, strideMiss, pr_flush_next, pr_ar_ack, pr_ar_ack_next, stride_learned;
+logic   shouldCleanup, shouldCleanup_context;
 logic   slaveReady_next, prefetchAddrInRange, zeroStride, ToBit, prefetchAddr_valid, prefetchAddr_valid_next;
 logic   [0:2] pr_opCode_next;
 
@@ -305,13 +305,11 @@ end
 // signals assignment
 assign stride_sampled = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles correctly negative strides
 assign zeroStride = (stride_sampled == {ADDR_BITS{1'b0}});
-assign rangeHit = s_ar_valid && (s_ar_addr >= bar) && (s_ar_addr <= limit);
 assign prefetchAddrInRange = (prefetchAddr_reg >= bar) && (prefetchAddr_reg <= limit);
-assign strideMiss = (stride_reg != stride_sampled) && !zeroStride && pr_context_valid;
-assign shouldCleanup = (s_ar_valid & pr_context_valid & (shouldCleanup_inRange | shouldCleanup_outRange))
-                        | strideMiss | ctrlFlush;
-assign shouldCleanup_inRange = (s_ar_id != pr_m_ar_id | s_ar_len != pr_m_ar_len) && rangeHit;
-assign shouldCleanup_outRange = (!rangeHit && pr_m_ar_id == s_ar_id);
+assign strideMiss = s_ar_valid && stride_learned && (stride_reg != stride_sampled) && !zeroStride;
+assign stride_learned = st_pr_cur == ST_PR_ACTIVE;
+assign shouldCleanup = shouldCleanup_context | ctrlFlush;
+assign shouldCleanup_context = s_ar_valid & pr_context_valid & (s_ar_id != pr_m_ar_id | s_ar_len != pr_m_ar_len | strideMiss);
 assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
 assign st_exec_changed = st_exec_cur != st_exec_next;
 // TODO pr_almostFull musk 'x' value of first cycle
