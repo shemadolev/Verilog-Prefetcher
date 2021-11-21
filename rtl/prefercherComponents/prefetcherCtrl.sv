@@ -101,7 +101,7 @@ clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
 
 //FSM States
 enum logic [1:0] {ST_PR_IDLE, ST_PR_ARM, ST_PR_ACTIVE, ST_PR_CLEANUP} st_pr_cur, st_pr_next;
-enum logic [2:0] {ST_EXEC_IDLE, ST_EXEC_S_AR_PR_ACCESS, ST_EXEC_S_AR_POLLING, ST_EXEC_S_R_POLLING, ST_EXEC_PR_AR_POLLING} st_exec_cur, st_exec_next;
+enum logic [2:0] {ST_EXEC_IDLE, ST_EXEC_S_AR_PR_ACCESS, ST_EXEC_M_AR_POLLING, ST_EXEC_S_R_POLLING} st_exec_cur, st_exec_next;
 
 always_ff @(posedge clk or negedge resetN) begin
 	if(!resetN || (watchdogHit && !watchdogHit_d && ToBit==1'b1)) begin
@@ -268,7 +268,7 @@ always_comb begin
                 m_ar_id_next  = pr_m_ar_id;
                 m_ar_addr_next = prefetchAddr_reg;
 
-                st_exec_next = ST_EXEC_PR_AR_POLLING;
+                st_exec_next = ST_EXEC_M_AR_POLLING;
             end
         end
 
@@ -277,11 +277,11 @@ always_comb begin
                 st_exec_next = ST_EXEC_IDLE;
             else begin
                 m_ar_valid_next = 1'b1;
-                st_exec_next = ST_EXEC_S_AR_POLLING;
+                st_exec_next = ST_EXEC_M_AR_POLLING;
             end
         end
         
-        ST_EXEC_S_AR_POLLING: begin
+        ST_EXEC_M_AR_POLLING: begin
             if(m_ar_ready & m_ar_valid) begin
                 m_ar_valid_next = 1'b0;
                 st_exec_next = ST_EXEC_IDLE;
@@ -296,15 +296,6 @@ always_comb begin
                 st_exec_next = ST_EXEC_IDLE;
             end
         end
-
-        ST_EXEC_PR_AR_POLLING: begin
-            m_ar_valid_next = 1'b1;
-            if(m_ar_ready) begin
-                m_ar_valid_next = 1'b0;
-                st_exec_next = ST_EXEC_IDLE;
-            end
-        end
-
 
     endcase
 end
