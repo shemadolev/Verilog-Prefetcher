@@ -6,10 +6,10 @@ clk=1; \
 
 `define printContext(MOD) \
 $display("------- BEGIN Prefetcher Context --------"); \
-$display("  st_pr_cur %d",MOD.st_pr_cur); \
-$display("  st_pr_next %d",MOD.st_pr_next); \
-$display("  st_exec_cur %d",MOD.st_exec_cur); \
-$display("  st_exec_next %d",MOD.st_exec_next); \
+$display("  st_pr_cur %s",MOD.st_pr_cur.name); \
+$display("  st_pr_next %s",MOD.st_pr_next.name); \
+$display("  st_exec_cur %s",MOD.st_exec_cur.name); \
+$display("  st_exec_next %s",MOD.st_exec_next.name); \
 $display("  pr_context_valid %b",MOD.pr_context_valid); \
 $display("  stride_sampled 0x%h",MOD.stride_sampled); \
 $display("  stride_learned %b",MOD.stride_learned); \
@@ -149,7 +149,6 @@ module prefetcherCtrl_tb();
         limit = BASE_ADDR * 2;
         $display("###### Reseted prefetcher");
 
-        s_ar_valid = 1'b1;
         s_ar_len = 4;
         s_ar_id = 3;
         pr_almostFull = 0;
@@ -157,8 +156,10 @@ module prefetcherCtrl_tb();
         windowSize=3;
         pr_reqCnt = 0;
 
+        $display("~~~~~~~~~~~~~~~~~~~ Requests burst ~~~~~~~~~~~~~~~~~~~");
         pr_addrHit = 0;
         for (int i=0; i<3; i++) begin
+            s_ar_valid = 1'b1;
             s_ar_addr = BASE_ADDR + i*64;
             `tick(clk); //ST_EXEC_IDLE (raise ready)
             $display("@@@@@@@   Master Read Req No.%d   @@@@@@@", i);
@@ -168,6 +169,7 @@ module prefetcherCtrl_tb();
             assert(prefetcherCtrl_dut.shouldCleanup==1'b0);
             assert(s_ar_ready == 1);
             `tick(clk); //ST_EXEC_IDLE -> ST_EXEC_S_AR_PR_ACCESS
+            s_ar_valid = 0;
 
             $display("###### %d.2", i);
             `printContext(prefetcherCtrl_dut);
@@ -188,8 +190,19 @@ module prefetcherCtrl_tb();
             `printContext(prefetcherCtrl_dut);
         end
 
-        s_ar_valid = 0;
-
+        $display("~~~~~~~~~~~~~~~~~~~ Read data burst ~~~~~~~~~~~~~~~~~~~");
+        m_r_valid = 1'b1;
+        #1; // essential for the TB to absorb m_r_valid
+        m_r_id = 3;
+        for (int i=0; i<3; i++) begin //ST_EXEC_IDLE always 
+            `tick(clk);
+            assert(m_r_ready == 1);
+            assert(pr_opCode == 0); //NOP, pr_opCode_next == readDataSlave 
+            `tick(clk);
+            assert(m_r_ready == 0);
+            assert(pr_opCode == 3); //readDataSlave, pr_opCode_next == NOP  
+        end
+        `printContext(prefetcherCtrl_dut);
         
     $display("**** All tests passed ****");
     
