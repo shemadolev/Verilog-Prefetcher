@@ -33,7 +33,7 @@ module prefetcherCtrl #(
         //AR (Read Request)
     input logic s_ar_valid,
     output logic s_ar_ready,
-    input logic [0:BURST_LEN_WIDTH-1]s_ar_len,
+    input logic [0:BURST_LEN_WIDTH-1] s_ar_len, //Read req will be learned only if burst len < no. of blocks
     input logic [0:ADDR_BITS-1] s_ar_addr, 
     input logic [0:TID_WIDTH-1] s_ar_id,
         //R (Read data)
@@ -70,7 +70,7 @@ logic   [0:ADDR_BITS-1] s_ar_addr_prev;
 logic   [0:ADDR_BITS-1] prefetchAddr_reg, prefetchAddr_next; //The address that should be prefetched
 
 // Control bits
-logic   reqValid, strideMiss, pr_flush_next, pr_ar_ack, pr_ar_ack_next, stride_learned;
+logic   reqValid, strideMiss, pr_flush_next, pr_ar_ack, pr_ar_ack_next, stride_learned, valid_burst;
 logic   shouldCleanup, shouldCleanup_context;
 logic   slaveReady_next, prefetchAddrInRange, zeroStride, ToBit, prefetchAddr_valid, prefetchAddr_valid_next;
 logic   [0:2] pr_opCode_next;
@@ -164,7 +164,7 @@ always_comb begin
 
     case (st_pr_cur)
         ST_PR_IDLE: begin
-            if(s_ar_valid & s_ar_ready) begin
+            if(s_ar_valid & s_ar_ready & valid_burst) begin
                 st_pr_next = ST_PR_ARM;
                 pr_m_ar_len_next = s_ar_len;
                 pr_m_ar_id_next = s_ar_id;
@@ -308,6 +308,10 @@ assign shouldCleanup_context = s_ar_valid & pr_context_valid & (s_ar_id != pr_m_
 assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
 assign st_exec_changed = st_exec_cur != st_exec_next;
 assign pr_isCleanup = st_pr_cur == ST_PR_CLEANUP;
+assign valid_burst = |({BURST_LEN_WIDTH{1'b1}} & {{(BURST_LEN_WIDTH-LOG_QUEUE_SIZE){1'b1}},{LOG_QUEUE_SIZE{1'b0}}} & (s_ar_len + 1));
 // TODO pr_almostFull musk 'x' value of first cycle
 
 endmodule
+
+//todo don't learn too big burst len
+
