@@ -6,10 +6,10 @@ clk=1; \
 
 `define printContext(MOD) \
 $display("------- BEGIN Prefetcher Context --------"); \
-$display("  st_pr_cur %s",MOD.st_pr_cur.name); \
-$display("  st_pr_next %s",MOD.st_pr_next.name); \
-$display("  st_exec_cur %s",MOD.st_exec_cur.name); \
-$display("  st_exec_next %s",MOD.st_exec_next.name); \
+$display("  st_pr_cur \t%s",MOD.st_pr_cur.name); \
+$display("  st_pr_next \t%s",MOD.st_pr_next.name); \
+$display("  st_exec_cur \t%s",MOD.st_exec_cur.name); \
+$display("  st_exec_next \t%s",MOD.st_exec_next.name); \
 $display("  pr_context_valid %b",MOD.pr_context_valid); \
 $display("  stride_sampled 0x%h",MOD.stride_sampled); \
 $display("  stride_learned %b",MOD.stride_learned); \
