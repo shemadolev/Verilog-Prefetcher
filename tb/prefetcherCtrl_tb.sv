@@ -51,7 +51,6 @@ module prefetcherCtrl_tb();
     logic    pr_context_valid; // burst & tag were learned
        // Read channel
      logic     pr_r_valid;
-     logic     pr_r_in_last;
         //Read Req Channel
      logic    [0:ADDR_BITS-1] pr_m_ar_addr;
      logic    [0:BURST_LEN_WIDTH-1] pr_m_ar_len;
@@ -67,7 +66,6 @@ module prefetcherCtrl_tb();
         //R (Read data)
      logic s_r_valid;
      logic s_r_ready;
-     logic s_r_last;
      logic [0:TID_WIDTH-1] s_r_id;
 
     // Master AXI ports (PR <-> DDR)
@@ -109,7 +107,6 @@ module prefetcherCtrl_tb();
         .pr_isCleanup(pr_isCleanup), // indicates that the prefecher is in cleaning
         .pr_context_valid(pr_context_valid), // burst & tag were learned
         .pr_r_valid(pr_r_valid),
-        .pr_r_in_last(pr_r_in_last),
         .pr_m_ar_addr(pr_m_ar_addr),
         .pr_m_ar_len(pr_m_ar_len),
         .pr_m_ar_id(pr_m_ar_id),
@@ -120,7 +117,6 @@ module prefetcherCtrl_tb();
         .s_ar_id(s_ar_id),
         .s_r_valid(s_r_valid),
         .s_r_ready(s_r_ready),
-        .s_r_last(s_r_last),
         .s_r_id(s_r_id),
         .m_ar_valid(m_ar_valid),
         .m_ar_ready(m_ar_ready),
@@ -156,7 +152,7 @@ module prefetcherCtrl_tb();
         windowSize=3;
         pr_reqCnt = 0;
 
-        $display("~~~~~~~~~~~~~~~~~~~ Requests burst ~~~~~~~~~~~~~~~~~~~");
+        $display("\n~~~~~~~~~~~~~~~~~~~ Requests burst ~~~~~~~~~~~~~~~~~~~");
         pr_addrHit = 0;
         for (int i=0; i<3; i++) begin
             s_ar_valid = 1'b1;
@@ -190,7 +186,9 @@ module prefetcherCtrl_tb();
             `printContext(prefetcherCtrl_dut);
         end
 
-        $display("~~~~~~~~~~~~~~~~~~~ Read data burst ~~~~~~~~~~~~~~~~~~~");
+        m_ar_ready = 0;
+
+        $display("\n~~~~~~~~~~~~~~~~~~~ DDR->Prefetch Read data ~~~~~~~~~~~~~~~~~~~");
         m_r_valid = 1'b1;
         #1; // essential for the TB to absorb m_r_valid
         m_r_id = 3;
@@ -203,10 +201,129 @@ module prefetcherCtrl_tb();
             assert(pr_opCode == 3); //readDataSlave, pr_opCode_next == NOP  
         end
         `printContext(prefetcherCtrl_dut);
+        m_r_valid = 1'b0;
         
+        `tick(clk);
+        `tick(clk);
+
+        //Check that we start prefetching
+        $display("\n~~~~~~~~~~~~~~~~~~~ Prefeth read req ~~~~~~~~~~~~~~~~~~~");
+        for (int i=0; i<3; i++) begin
+            `printContext(prefetcherCtrl_dut);
+            m_ar_ready = 1;
+            assert(pr_opCode == 0);
+            assert(m_ar_valid == 1);
+            assert(m_ar_addr == prefetcherCtrl_dut.prefetchAddr_reg);
+            
+            `tick(clk);
+            m_ar_ready = 0;
+            assert(prefetcherCtrl_dut.st_exec_cur == 0); //ST_EXEC_IDLE
+            assert(prefetcherCtrl_dut.pr_opCode_next == 1); //readReqPref
+            assert(m_ar_valid == 0);
+
+            `tick(clk);
+            assert(pr_opCode == 1);//readReqPref
+            `tick(clk);
+        end
+        
+
+        $display("\n~~~~~~~~~~~~~~~~~~~ Prefeth -> NVDLA Read data ~~~~~~~~~~~~~~~~~~~");
+        //st_exec_cur == ST_EXEC_M_AR_POLLING
+        pr_r_valid = 1;
+        s_r_ready = 0;
+        m_ar_ready = 1; //to escape ST_EXEC_M_AR_POLLING
+        `tick(clk);
+        m_ar_ready = 0;
+        for (int i=0; i<3; i++) begin
+            assert(pr_opCode == 0);  //NOP
+            assert(s_r_valid == 0);
+
+            `tick(clk);
+            assert(pr_opCode == 4);  //readDataPromise
+            assert(s_r_valid == 1);
+
+            //Wait and see the ctrl is polling
+            `tick(clk);
+            assert(pr_opCode == 0);  //NOP
+            assert(s_r_valid == 1);
+            `tick(clk);
+            assert(pr_opCode == 0);  //NOP
+            assert(s_r_valid == 1);
+            
+            s_r_ready = 1;
+            #1;
+            `printContext(prefetcherCtrl_dut);
+            `tick(clk);
+            s_r_ready = 0;
+            assert(s_r_valid == 0);
+        end
+        
+        $display("\n~~~~~~~~~~~~~~~~~~~ Read Req - Stride violation ~~~~~~~~~~~~~~~~~~~");
+        //ST_EXEC_IDLE
+        pr_r_valid = 0;
+        s_ar_valid = 1;
+        s_ar_addr = BASE_ADDR;
+        pr_hasOutstanding = 1;
+        pr_r_valid = 0;
+        #1;
+        assert(prefetcherCtrl_dut.shouldCleanup == 1);
+        `printContext(prefetcherCtrl_dut);
+        $display("strideMiss=%b",prefetcherCtrl_dut.strideMiss);
+        $display("stride_sampled=0x%h",prefetcherCtrl_dut.stride_sampled);
+        $display("stride_reg=0x%h",prefetcherCtrl_dut.stride_reg);
+        $display("s_ar_addr=0x%h",prefetcherCtrl_dut.s_ar_addr);
+        $display("s_ar_addr_prev=0x%h",prefetcherCtrl_dut.s_ar_addr_prev);
+
+        `tick(clk); //ST_EXEC_IDLE > ST_EXEC_IDLE
+        assert(pr_isCleanup == 1);
+        assert(s_ar_ready == 0); //Make sure EXEC is not passing the AR
+        `printContext(prefetcherCtrl_dut);
+
+        for (int i=0; i<3; i++) begin
+            for (int i=0; i<3; i++) begin
+                `tick(clk);
+                assert(pr_isCleanup == 1);
+            end
+            //toggle, but keep at least one up - should stay in cleanup
+            pr_hasOutstanding = ~pr_hasOutstanding;
+            pr_r_valid = ~pr_r_valid;
+        end
+
+        pr_hasOutstanding = 0;
+        pr_r_valid = 0;
+        `tick(clk);
+        `printContext(prefetcherCtrl_dut);
+        assert(pr_isCleanup == 0);
+        assert(prefetcherCtrl_dut.st_pr_cur == 0); //ST_PR_IDLE
+
+
+        $display("\n~~~~~~~~~~~~~~~~~~~ Watchdog ~~~~~~~~~~~~~~~~~~~");
+        watchdogCnt = 10;
+        //Read data in EXEC, will reset the timeout flag
+        m_r_valid = 1'b1;
+        #1; // essential for the TB to absorb m_r_valid
+        m_r_id = 3;
+        `tick(clk);
+        assert(m_r_ready == 1);
+        assert(pr_opCode == 0); //NOP, pr_opCode_next == readDataSlave 
+        `tick(clk);
+        assert(prefetcherCtrl_dut.ToBit == 0);
+        assert(m_r_ready == 0);
+        assert(pr_opCode == 3); //readDataSlave, pr_opCode_next == NOP  
+        m_r_valid = 1'b0;        
+        `tick(clk);
+        `tick(clk);
+
+
+        for (int i=0; i<3; i++) begin
+            //todo 
+        end
+
     $display("**** All tests passed ****");
     
         $stop;
     end
 
 endmodule
+
+//todo check watchdog: TO 0->1, AR, 1->0 ; TO 0->1->0 + cleanup
