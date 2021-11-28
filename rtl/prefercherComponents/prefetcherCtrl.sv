@@ -307,6 +307,7 @@ assign shouldCleanup = shouldCleanup_context | ctrlFlush;
 assign shouldCleanup_context = s_ar_valid & pr_context_valid & (s_ar_id != pr_m_ar_id | s_ar_len != pr_m_ar_len | strideMiss);
 assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
 assign st_exec_changed = st_exec_cur != st_exec_next;
+assign pr_isCleanup = st_pr_cur == ST_PR_CLEANUP;
 // TODO pr_almostFull musk 'x' value of first cycle
 
 endmodule
