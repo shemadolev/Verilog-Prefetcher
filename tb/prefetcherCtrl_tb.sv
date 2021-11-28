@@ -6,10 +6,10 @@ clk=1; \
 
 `define printContext(MOD) \
 $display("------- BEGIN Prefetcher Context --------"); \
-$display("  st_pr_cur %d",MOD.st_pr_cur); \
-$display("  st_pr_next %d",MOD.st_pr_next); \
-$display("  st_exec_cur %d",MOD.st_exec_cur); \
-$display("  st_exec_next %d",MOD.st_exec_next); \
+$display("  st_pr_cur \t%s",MOD.st_pr_cur.name); \
+$display("  st_pr_next \t%s",MOD.st_pr_next.name); \
+$display("  st_exec_cur \t%s",MOD.st_exec_cur.name); \
+$display("  st_exec_next \t%s",MOD.st_exec_next.name); \
 $display("  pr_context_valid %b",MOD.pr_context_valid); \
 $display("  stride_sampled 0x%h",MOD.stride_sampled); \
 $display("  stride_learned %b",MOD.stride_learned); \
@@ -187,9 +187,25 @@ module prefetcherCtrl_tb();
             $display("###### %d.4", i);
             `printContext(prefetcherCtrl_dut);
         end
-
         s_ar_valid = 0;
 
+        //Prefetch FSM should now on try to send AR of prefetchAddr
+
+        //Check priority of getting R from Slave:
+        m_r_valid = 1'b1;
+        // m_r_ready = 
+        m_r_id = 3;
+
+        for (int i=0; i<3; i++) begin
+            `tick(clk);
+            assert(m_r_ready == 1'b0);
+            `tick(clk);
+            assert(m_r_ready == 1'b1);
+        end
+
+
+//todo Diff r_id => do nothinh
+//todo Doing ar prefetch
         
     $display("**** All tests passed ****");
     

@@ -2,7 +2,11 @@
  * Description: prefetch data path is the base module (queue) of a prefetcher. main capabilities:
  *              * Stores outstanding requests and data responses from DRAM
  *              * Supports 4 opreations, for each block in the queue, according to 5 opcodes: 
-                    0 - NOP ,1 - readReqPref,  2 - readReqMaster(AXI AR/Read Request), 3 - readDataSlave(AXI R/Read Data), 4 - readDataPromise
+                    0 - NOP
+                    1 - readReqPref //todo
+                    2 - readReqMaster(AXI AR/Read Request) //todo
+                    3 - readDataSlave(AXI R/Read Data): Stores the reqData, reqLast from the previous cycle into the next block that expects data.
+                    4 - readDataPromise //todo
                 * errorCode:
                     0 - no error, 1 - Invalid opcode, 2 - ReadReq to full queue, 3 - Requesting data read when not ready, 4 - Read data overflow
  */
@@ -19,7 +23,7 @@ module	prefetcherData #(
     input logic     resetN,
     input logic     [0:ADDR_BITS-1] reqAddr,
     input logic	    [0:BURST_LEN_WIDTH-1] reqBurstLen, //Must not change during work
-    input logic	    [0:BLOCK_DATA_SIZE_BITS-1] reqData,
+    input logic	    [0:BLOCK_DATA_SIZE_BITS-1] reqData, 
     input logic     reqLast,
     input logic     [0:2] reqOpcode,
 
@@ -52,6 +56,8 @@ logic [0:LOG_QUEUE_SIZE-1] readDataPtr; //Points to next block that readDataSlav
 logic [0:LOG_QUEUE_SIZE] validCnt;
 logic isEmpty, isFull, dataReady_curBurst, dataReady_nxtBurst, active;
 logic [0:BURST_LEN_WIDTH-1] burstOffset; //For readDataPromise: Offset inside a burst
+logic [0:BLOCK_DATA_SIZE_BITS-1] reqData_prev, 
+logic reqLast_prev;
 
 //find the valid address index
 findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(ADDR_BITS)) findAddrIdx 
@@ -111,6 +117,10 @@ begin
         burstOffset <= {BURST_LEN_WIDTH{1'b0}};
     end else begin
         errorCode <= 3'd0;
+
+        reqData_prev <= reqData;
+        reqLast_prev <= reqLast;
+
         case (reqOpcode)
             // readReqPref (Read requests which were initiated by transactions from the prefetching mechanism)
             // Assupmtion: Prefetcher will not demand an existing readReq
@@ -155,8 +165,8 @@ begin
             3'd3: begin
                 if(validVec[readDataPtr] != 1'b0) begin
                     dataValidVec[readDataPtr] <= 1'b1;
-                    dataMat[readDataPtr] <= reqData;
-                    lastVec[readDataPtr] <= reqLast;
+                    dataMat[readDataPtr] <= reqData_prev;
+                    lastVec[readDataPtr] <= reqLast_prev;
                     readDataPtr <= readDataPtr + 1'b1;
                 end else begin
                     errorCode <= 3'd4; //Read data overflow

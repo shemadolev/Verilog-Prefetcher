@@ -1,5 +1,8 @@
 //Notes: On flush, reset the stride FSM; If stride changes, do nothing (if we'll get hit in MOQ, blocks will pop out, else timeout will expire)
 
+//Assumptions:
+// * When any _valid is up, the data (and meta-data, such as 'id') doesn't change.
+
 module prefetcherTop(
     input logic     clk,
     input logic     en, //NOTE: en==1'b1, still need to handle en=1'b0
@@ -63,7 +66,6 @@ logic ctrlFlush;
 logic pr_almostFull;
 logic [0:LOG_QUEUE_SIZE] prefetchReqCnt;
 logic pr_r_valid;
-logic pr_r_in_last;
 logic pr_addrHit;
 logic pr_hasOutstanding;
 logic [0:2] pr_opCode;
@@ -87,7 +89,6 @@ logic [0:ADDR_BITS-1] ctrl_m_ar_addr;
 logic [0:TID_WIDTH-1] ctrl_m_ar_id;
 logic ctrl_s_r_valid;
 logic ctrl_s_r_ready;
-logic ctrl_s_r_last;
 logic [0:TID_WIDTH-1] ctrl_s_r_id;
 logic ctrl_m_r_valid;
 logic ctrl_m_r_ready;
@@ -137,7 +138,6 @@ prefetcherCtrl #(
     .pr_almostFull(pr_almostFull), 
     .prefetchReqCnt(prefetchReqCnt), 
     .pr_r_valid(pr_r_valid), 
-    .pr_r_in_last(pr_r_in_last), 
     .pr_addrHit(pr_addrHit), 
     .pr_hasOutstanding(pr_hasOutstanding), 
     .pr_m_ar_addr(pr_m_ar_addr), 
@@ -159,7 +159,6 @@ prefetcherCtrl #(
     .m_ar_id(ctrl_m_ar_id), 
     .s_r_valid(ctrl_s_r_valid), 
     .s_r_ready(ctrl_s_r_ready), 
-    .s_r_last(ctrl_s_r_last), 
     .s_r_id(ctrl_s_r_id), 
     .m_r_valid(ctrl_m_r_valid), 
     .m_r_ready(ctrl_m_r_ready),

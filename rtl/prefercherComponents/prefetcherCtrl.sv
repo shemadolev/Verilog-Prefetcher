@@ -24,7 +24,6 @@ module prefetcherCtrl #(
     output logic    pr_context_valid, // burst & tag were learned
        // Read channel
     input logic     pr_r_valid,
-    input logic     pr_r_in_last,
         //Read Req Channel
     output logic    [0:ADDR_BITS-1] pr_m_ar_addr,
     output logic    [0:BURST_LEN_WIDTH-1] pr_m_ar_len,
@@ -40,7 +39,6 @@ module prefetcherCtrl #(
         //R (Read data)
     output logic s_r_valid,
     input logic s_r_ready,
-    output logic s_r_last,
     output logic [0:TID_WIDTH-1] s_r_id,
 
     // Master AXI ports (PR <-> DDR)
@@ -84,7 +82,7 @@ logic   [0:TID_WIDTH-1] m_ar_id_next;
 
 logic m_r_ready_next, m_ar_valid_next;
 
-logic s_r_valid_next, s_r_in_last_next;
+logic s_r_valid_next;
 
 logic s_ar_ready_next;
 
@@ -146,7 +144,6 @@ always_ff @(posedge clk or negedge resetN) begin
             m_ar_id <= m_ar_id_next;
 
             s_r_valid <= s_r_valid_next;
-            s_r_last <= s_r_in_last_next;
             
             pr_ar_ack <= pr_ar_ack_next;
 
@@ -219,7 +216,6 @@ always_comb begin
     m_ar_valid_next = 1'b0;
     
     s_r_valid_next = 1'b0;
-    s_r_in_last_next = s_r_last;
 
     s_r_id = pr_m_ar_id;
 
@@ -248,16 +244,15 @@ always_comb begin
             end
             else if (pr_r_valid) begin
                 s_r_valid_next = 1'b1;
-                s_r_in_last_next = pr_r_in_last;
                 pr_opCode_next = 3'd4; //readDataPromise
                 st_exec_next = ST_EXEC_S_R_POLLING;
             end
             else if (m_r_valid) begin
+                if(m_r_ready)
+                    pr_opCode_next = 3'd3; //readDataSlave
+                
                 if(m_r_id == pr_m_ar_id) begin
-                    if(m_r_ready)
-                        pr_opCode_next = 3'd3; //readDataSlave
-                    else
-                        m_r_ready_next = 1'b1;
+                    m_r_ready_next = 1'b1;
                 end
             end
             else if (prefetchAddr_valid & ~shouldCleanup & ~pr_almostFull) begin
