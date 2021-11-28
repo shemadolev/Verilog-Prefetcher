@@ -149,7 +149,6 @@ module prefetcherCtrl_tb();
         limit = BASE_ADDR * 2;
         $display("###### Reseted prefetcher");
 
-        s_ar_valid = 1'b1;
         s_ar_len = 4;
         s_ar_id = 3;
         pr_almostFull = 0;
@@ -157,8 +156,10 @@ module prefetcherCtrl_tb();
         windowSize=3;
         pr_reqCnt = 0;
 
+        $display("~~~~~~~~~~~~~~~~~~~ Requests burst ~~~~~~~~~~~~~~~~~~~");
         pr_addrHit = 0;
         for (int i=0; i<3; i++) begin
+            s_ar_valid = 1'b1;
             s_ar_addr = BASE_ADDR + i*64;
             `tick(clk); //ST_EXEC_IDLE (raise ready)
             $display("@@@@@@@   Master Read Req No.%d   @@@@@@@", i);
@@ -168,6 +169,7 @@ module prefetcherCtrl_tb();
             assert(prefetcherCtrl_dut.shouldCleanup==1'b0);
             assert(s_ar_ready == 1);
             `tick(clk); //ST_EXEC_IDLE -> ST_EXEC_S_AR_PR_ACCESS
+            s_ar_valid = 0;
 
             $display("###### %d.2", i);
             `printContext(prefetcherCtrl_dut);
@@ -187,25 +189,20 @@ module prefetcherCtrl_tb();
             $display("###### %d.4", i);
             `printContext(prefetcherCtrl_dut);
         end
-        s_ar_valid = 0;
 
-        //Prefetch FSM should now on try to send AR of prefetchAddr
-
-        //Check priority of getting R from Slave:
+        $display("~~~~~~~~~~~~~~~~~~~ Read data burst ~~~~~~~~~~~~~~~~~~~");
         m_r_valid = 1'b1;
-        // m_r_ready = 
+        #1; // essential for the TB to absorb m_r_valid
         m_r_id = 3;
-
-        for (int i=0; i<3; i++) begin
+        for (int i=0; i<3; i++) begin //ST_EXEC_IDLE always 
             `tick(clk);
-            assert(m_r_ready == 1'b0);
+            assert(m_r_ready == 1);
+            assert(pr_opCode == 0); //NOP, pr_opCode_next == readDataSlave 
             `tick(clk);
-            assert(m_r_ready == 1'b1);
+            assert(m_r_ready == 0);
+            assert(pr_opCode == 3); //readDataSlave, pr_opCode_next == NOP  
         end
-
-
-//todo Diff r_id => do nothinh
-//todo Doing ar prefetch
+        `printContext(prefetcherCtrl_dut);
         
     $display("**** All tests passed ****");
     
