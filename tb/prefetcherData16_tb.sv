@@ -105,7 +105,7 @@ module prefetcherDataTb ();
         $display("###### Reseted prefetcher");
         resetN=1;
         `printPrefetcher(prefetcherData_dut);
-        reqBurstLen=3;
+        reqBurstLen=2; //==3
 
     //readReqMaster
         reqAddr=64'hdeadbeef;
@@ -264,7 +264,6 @@ module prefetcherDataTb ();
         $display("###### Reseted prefetcher");
         resetN=1;
         `printPrefetcher(prefetcherData_dut);
-        reqBurstLen=3;
 
     $display("**** All tests passed ****");
     

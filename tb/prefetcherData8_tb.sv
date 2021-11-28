@@ -94,7 +94,7 @@ module prefetcherDataTb ();
         $display("###### Reseted prefetcher");
         resetN=1;
         `printPrefetcher(prefetcherData_dut);
-        reqBurstLen=1; 
+        reqBurstLen=0; //==1 
 
     //readReqMaster
         reqAddr=64'hdeadbeef;
