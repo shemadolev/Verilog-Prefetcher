@@ -104,15 +104,15 @@ logic ctrl_m_r_ready;
     // inputs
     .clk(clk), 
     .resetN(resetN), 
-    .reqAddr(pr_addr), 
+    .reqAddr(pr_m_ar_addr), 
     .reqBurstLen(pr_m_ar_len), 
     .reqData(m_r_data), 
     .reqLast(m_r_last) , 
     .reqOpcode(pr_opCode), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
     // outputs
-    .respData(pr_r_out_data), 
-    .respLast(pr_r_out_last), 
+    .respData(pr_r_out_data),
+    .respLast(pr_r_out_last),
     .addrHit(pr_addrHit),
     .pr_r_valid(pr_r_valid), 
     .prefetchReqCnt(prefetchReqCnt), 
