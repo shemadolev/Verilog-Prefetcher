@@ -105,7 +105,7 @@ logic ctrl_m_r_ready;
     .clk(clk), 
     .resetN(resetN), 
     .reqAddr(pr_m_ar_addr), 
-    .reqBurstLen(pr_m_ar_len), 
+    .reqBurstLen(pr_m_ar_len[0:LOG_QUEUE_SIZE-1]), 
     .reqData(m_r_data), 
     .reqLast(m_r_last) , 
     .reqOpcode(pr_opCode), 
