@@ -12,16 +12,16 @@
  */
 module	prefetcherData #(
     parameter LOG_QUEUE_SIZE = 4'd8, // the size of the queue [2^x] 
-    localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE,
+    localparam [0:LOG_QUEUE_SIZE] QUEUE_SIZE = 1<<LOG_QUEUE_SIZE,
     parameter LOG_BLOCK_DATA_BYTES = 3'd6, //[Bytes]
     localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3, //shift left by 3 to convert Bytes->bits
     parameter ADDR_BITS = 7'd64, // the size of the address [bits]
-    parameter PROMISE_WIDTH = 3'd3, // the log size of the promise's counter
+    parameter PROMISE_WIDTH = 3'd3 // the log size of the promise's counter
 )(
     input logic	    clk,
     input logic     resetN,
     input logic     [0:ADDR_BITS-1] reqAddr,
-    input logic	    [0:LOG_QUEUE_SIZE-1] reqBurstLen, //Must not change during work, cannot be larger than the size of queue
+    input logic	    [0:LOG_QUEUE_SIZE-1] reqBurstLen, //Must not change during work, cannot be >= the size of queue
     input logic	    [0:BLOCK_DATA_SIZE_BITS-1] reqData, 
     input logic     reqLast,
     input logic     [0:2] reqOpcode,
@@ -54,8 +54,8 @@ logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, addrIdx, burst_len;
 logic [0:LOG_QUEUE_SIZE-1] readDataPtr; //Points to next block that readDataSlave writes to 
 logic [0:LOG_QUEUE_SIZE] validCnt;
 logic isEmpty, isFull, dataReady_curBurst, dataReady_nxtBurst, active;
-logic [0:BURST_LEN_WIDTH-1] burstOffset; //For readDataPromise: Offset inside a burst
-logic [0:BLOCK_DATA_SIZE_BITS-1] reqData_prev, 
+logic [0:LOG_QUEUE_SIZE-1] burstOffset; //For readDataPromise: Offset inside a burst
+logic [0:BLOCK_DATA_SIZE_BITS-1] reqData_prev;
 logic reqLast_prev;
 
 //find the valid address index
@@ -112,7 +112,7 @@ begin
         tailPtr <= {LOG_QUEUE_SIZE{1'b0}};;
         readDataPtr <= {LOG_QUEUE_SIZE{1'b0}};;
         errorCode <= 3'b0;
-        burstOffset <= {BURST_LEN_WIDTH{1'b0}};
+        burstOffset <= {LOG_QUEUE_SIZE{1'b0}};
     end else begin
         errorCode <= 3'd0;
 
