@@ -15,14 +15,24 @@ $display(" ** Requset signal **"); \
 $display("   addrHit:%d addrIdx:%d", MOD.addrHit, MOD.addrIdx); \
 for(int i=0;i<MOD.QUEUE_SIZE;i++) begin \
     $display("--Block           %d ",i); \
+    if(MOD.headPtr == i) \
+        $display(" ^^^ HEAD ^^^"); \
+    if(MOD.tailPtr == i) \
+        $display(" ^^^ TAIL ^^^"); \
     $display("  valid           %d",MOD.validVec[i]); \
-    $display("  addrValid       %b",MOD.addrValid[i]); \
-    $display("  address         0x%h",MOD.blockAddrMat[i]); \
-    $display("  data valid      %d",MOD.dataValidVec[i]); \
-    $display("  data            0x%h",MOD.dataMat[i]); \
-    $display("  last            0x%h",MOD.lastVec[i]); \
-    $display("  prefetchReqVec  %b",MOD.prefetchReqVec[i]); \
-    $display("  promiseCnt      %d",MOD.promiseCnt[i]); \
+    if(MOD.validVec[i]) begin \
+        $display("  addrValid       %b",MOD.addrValid[i]); \
+        if(MOD.addrValid[i]) begin \
+            $display("  address         0x%h",MOD.blockAddrMat[i]); \
+            $display("  prefetchReq     %b",MOD.prefetchReqVec[i]); \
+            $display("  promiseCnt      %d",MOD.promiseCnt[i]); \
+        end \
+        $display("  data valid      %d",MOD.dataValidVec[i]); \
+        if(MOD.dataValidVec[i]) begin \
+            $display("  data            0x%h",MOD.dataMat[i]); \
+            $display("  last            0x%h",MOD.lastVec[i]); \
+        end \
+    end \
 end \
 $display(" ** Resp data **"); \
 $display(" pr_r_valid:%b respData:0x%h respLast:%b", MOD.pr_r_valid, MOD.respData, MOD.respLast); \
@@ -163,7 +173,7 @@ module prefetcherDataTb ();
         $display("###### After requesting the prefetched addresses (twice for each)");
         `printPrefetcher(prefetcherData_dut);
         assert(prefetchReqCnt == 0); //no unrequested addresses at this point
-        assert(pr_r_valid == 1'b1);
+        assert(pr_r_valid == 1'b0);
 
     //Flush 
         resetN=0;
