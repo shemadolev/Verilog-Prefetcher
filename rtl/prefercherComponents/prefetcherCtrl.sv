@@ -299,7 +299,7 @@ always_comb begin
 end
 
 // signals assignment
-assign stride_sampled = s_ar_addr - s_ar_addr_prev; //TODO: Check if handles correctly negative strides
+assign stride_sampled = s_ar_addr - s_ar_addr_prev;
 assign zeroStride = (stride_sampled == {ADDR_BITS{1'b0}});
 assign prefetchAddrInRange = (prefetchAddr_reg >= bar) && (prefetchAddr_reg <= limit);
 assign strideMiss = s_ar_valid && stride_learned && (stride_reg != stride_sampled) && !zeroStride;
@@ -309,10 +309,8 @@ assign shouldCleanup_context = s_ar_valid & pr_context_valid & (s_ar_id != pr_m_
 assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
 assign st_exec_changed = st_exec_cur != st_exec_next;
 assign pr_isCleanup = st_pr_cur == ST_PR_CLEANUP;
-assign valid_burst = |({BURST_LEN_WIDTH{1'b1}} & {{(BURST_LEN_WIDTH-LOG_QUEUE_SIZE){1'b1}},{LOG_QUEUE_SIZE{1'b0}}} & (s_ar_len + 1));
-// TODO pr_almostFull musk 'x' value of first cycle
+assign valid_burst = ~|({{(BURST_LEN_WIDTH - LOG_QUEUE_SIZE + 1){1'b1}},{(LOG_QUEUE_SIZE - 1){1'b0}}} & s_ar_len); //Accept only burst len that will be <= 1/2 of QUEUE SIZE
 
 endmodule
 
-//todo don't learn too big burst len
 
