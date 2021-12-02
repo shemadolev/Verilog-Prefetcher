@@ -88,19 +88,17 @@ vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) tailBurst_mask
                  .outMask(tailBurstMask)
                 );
 
-always_comb begin
-    active = |validVec; //at least one block is valid
-    respData = dataReady_curBurst ? dataMat[headPtr + burstOffset] : dataMat[headPtr + burst_len + burstOffset]; //Pass data in head/head+1, based on promise&dataValid of head
-    respLast = lastVec[headPtr + burstOffset];
-    isFull = (QUEUE_SIZE - validCnt) < burst_len;
-    isEmpty = ~|validVec;
-    almostFull = (validCnt + (crs_almostFullSpacer * burst_len)  >= QUEUE_SIZE) & active;
-    dataReady_curBurst = (validVec[headPtr + burstOffset] && dataValidVec[headPtr + burstOffset] == 1'b1 && promiseCnt[headPtr] > {(PROMISE_WIDTH){1'b0}});
-    dataReady_nxtBurst = (validVec[headPtr + burst_len] && dataValidVec[headPtr + burst_len] == 1'b1 && promiseCnt[headPtr + burst_len] > {(PROMISE_WIDTH){1'b0}});
-    pr_r_valid = (dataReady_curBurst || ((promiseCnt[headPtr] == {(PROMISE_WIDTH){1'b0}}) && dataReady_nxtBurst)) & active;
-    hasOutstanding = |((dataValidVec & validVec) ^ validVec);
-    burst_len = reqBurstLen + 1;
-end
+assign burst_len = reqBurstLen + 1;
+assign active = |validVec; //at least one block is valid
+assign respData = dataReady_curBurst ? dataMat[headPtr + burstOffset] : dataMat[headPtr + burst_len + burstOffset]; //Pass data in head/head+1, based on promise&dataValid of head
+assign respLast = lastVec[headPtr + burstOffset];
+assign isFull = (QUEUE_SIZE - validCnt) < {{1'b0},{burst_len}};
+assign isEmpty = ~|validVec;
+assign almostFull = (validCnt + (crs_almostFullSpacer * burst_len)  >= QUEUE_SIZE) & active;
+assign dataReady_curBurst = (validVec[headPtr + burstOffset] && dataValidVec[headPtr + burstOffset] == 1'b1 && promiseCnt[headPtr] > {(PROMISE_WIDTH){1'b0}});
+assign dataReady_nxtBurst = (validVec[headPtr + burst_len] && dataValidVec[headPtr + burst_len] == 1'b1 && promiseCnt[headPtr + burst_len] > {(PROMISE_WIDTH){1'b0}});
+assign pr_r_valid = (dataReady_curBurst || ((promiseCnt[headPtr] == {(PROMISE_WIDTH){1'b0}}) && dataReady_nxtBurst)) & active;
+assign hasOutstanding = |((dataValidVec & validVec) ^ validVec);
 
 // 0 - NOP ,1 - readReqPref,  2 - readReqMaster(AXI AR/Read Request), 3 - readDataSlave(AXI R/Read Data), 4 - readDataPromise
 
