@@ -4,7 +4,7 @@ clk=0; \
 clk=1; \
 #1
 
-`define printContext(MOD) \
+`define printContext(MOD) #1; \
 $display("------- BEGIN Prefetcher Context --------"); \
 $display("  st_pr_cur \t%s",MOD.st_pr_cur.name); \
 $display("  st_pr_next \t%s",MOD.st_pr_next.name); \
@@ -12,7 +12,7 @@ $display("  st_exec_cur \t%s",MOD.st_exec_cur.name); \
 $display("  st_exec_next \t%s",MOD.st_exec_next.name); \
 $display("  pr_context_valid %b",MOD.pr_context_valid); \
 $display("  stride_sampled 0x%h",MOD.stride_sampled); \
-$display("  stride_learned %b",MOD.stride_learned); \
+$display("  valid_burst %b",MOD.valid_burst); \
 if(MOD.stride_learned) \
     $display("  stride_reg 0x%h",MOD.stride_reg); \
     $display("  bar 0x%h, limit 0x%h",MOD.bar, MOD.limit); \
@@ -136,6 +136,7 @@ module prefetcherCtrl_tb();
         localparam BASE_ADDR = 64'hdeadbeef;
         resetN=0;
         ctrlFlush=0;
+        watchdogCnt = 10'd1000;
 
         `tick(clk);
         `printContext(prefetcherCtrl_dut);
@@ -151,6 +152,8 @@ module prefetcherCtrl_tb();
         m_ar_ready = 1;
         windowSize=3;
         pr_reqCnt = 0;
+
+        `tick(clk);
 
         $display("\n~~~~~~~~~~~~~~~~~~~ Requests burst ~~~~~~~~~~~~~~~~~~~");
         pr_addrHit = 0;
@@ -289,7 +292,8 @@ module prefetcherCtrl_tb();
             pr_hasOutstanding = ~pr_hasOutstanding;
             pr_r_valid = ~pr_r_valid;
         end
-
+        s_ar_valid = 0;
+        s_r_ready = 1;
         pr_hasOutstanding = 0;
         pr_r_valid = 0;
         `tick(clk);
@@ -300,25 +304,39 @@ module prefetcherCtrl_tb();
 
         $display("\n~~~~~~~~~~~~~~~~~~~ Watchdog ~~~~~~~~~~~~~~~~~~~");
         watchdogCnt = 10;
-        //Read data in EXEC, will reset the timeout flag
-        m_r_valid = 1'b1;
-        #1; // essential for the TB to absorb m_r_valid
-        m_r_id = 3;
+        //st_exec_cur == ST_EXEC_IDLE
+        pr_r_valid = 1;
+        s_r_ready = 0;
         `tick(clk);
-        assert(m_r_ready == 1);
-        assert(pr_opCode == 0); //NOP, pr_opCode_next == readDataSlave 
-        `tick(clk);
-        assert(prefetcherCtrl_dut.ToBit == 0);
-        assert(m_r_ready == 0);
-        assert(pr_opCode == 3); //readDataSlave, pr_opCode_next == NOP  
-        m_r_valid = 1'b0;        
-        `tick(clk);
-        `tick(clk);
+        for (int i=0; i<1; i++) begin
+            assert(pr_opCode == 4);  //readDataPromise
+            assert(s_r_valid == 1);
+            assert(prefetcherCtrl_dut.st_exec_next.name == "ST_EXEC_S_R_POLLING");
 
-
-        for (int i=0; i<3; i++) begin
-            //todo 
+            s_r_ready = 1;
+            `tick(clk);
+            s_r_ready = 0;
+            assert(s_r_valid == 0);
         end
+        `tick(clk);
+        `tick(clk);
+
+        assert(prefetcherCtrl_dut.ToBit == 1'b0);
+
+        $display("Waiting for timeout 0->1:");
+        while(prefetcherCtrl_dut.ToBit == 1'b0) begin
+            `tick(clk);
+            $display("tick");
+        end
+
+        //prefetcherCtrl_dut.ToBit == 1'b1
+        $display("Waiting for timeout 1->0:");
+        while(prefetcherCtrl_dut.ToBit == 1'b1) begin
+            `tick(clk);
+            $display("tick");
+        end
+        assert(prefetcherCtrl_dut.pr_flush == 1'b1);
+        assert(prefetcherCtrl_dut.st_pr_cur.name != "ST_PR_CLEANUP");
 
     $display("**** All tests passed ****");
     
@@ -326,5 +344,3 @@ module prefetcherCtrl_tb();
     end
 
 endmodule
-
-//todo check watchdog: TO 0->1, AR, 1->0 ; TO 0->1->0 + cleanup
