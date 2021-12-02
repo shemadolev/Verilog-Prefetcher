@@ -192,18 +192,19 @@ module prefetcherCtrl_tb();
         m_r_valid = 1'b1;
         #1; // essential for the TB to absorb m_r_valid
         m_r_id = 3;
+
+        `tick(clk);
+        assert(m_r_ready == 1);
         for (int i=0; i<3; i++) begin //ST_EXEC_IDLE always 
             `tick(clk);
-            assert(m_r_ready == 1);
-            assert(pr_opCode == 0); //NOP, pr_opCode_next == readDataSlave 
-            `tick(clk);
-            assert(m_r_ready == 0);
-            assert(pr_opCode == 3); //readDataSlave, pr_opCode_next == NOP  
+            assert(m_r_ready == 1) else $error("i=%d m_r_ready=%d",i,prefetcherCtrl_dut.m_r_ready);
+            assert(pr_opCode == 3) else $error("i=%d pr_opCode=%d",i,prefetcherCtrl_dut.pr_opCode); //readDataSlave, pr_opCode_next == NOP  
+            `printContext(prefetcherCtrl_dut);
         end
-        `printContext(prefetcherCtrl_dut);
         m_r_valid = 1'b0;
         
         `tick(clk);
+        assert(m_r_ready == 0);
         `tick(clk);
 
         //Check that we start prefetching
