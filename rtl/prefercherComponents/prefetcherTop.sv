@@ -103,7 +103,7 @@ logic ctrl_m_r_ready;
   ) prDataPath (
     // inputs
     .clk(clk), 
-    .resetN(resetN), 
+    .resetN(prDataPath_resetN), 
     .reqAddr(pr_m_ar_addr), 
     .reqBurstLen(pr_m_ar_len[0:LOG_QUEUE_SIZE-1]), 
     .reqData(m_r_data), 
@@ -170,7 +170,7 @@ prefetcherCtrl #(
 );
 
 always_comb begin
-    prDataPath_resetN = resetN & pr_flush;
+    prDataPath_resetN = resetN & ~pr_flush;
     //todo When checking (_addr <= limit), _len should also be considered
     sel_ar_pr = ~s_ar_valid | cleanup_st | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit)) | ctrl_m_ar_valid; //todo consider removing the 'cleanup' condition, to enable req's with other IDs
     sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (pr_m_ar_id == m_r_id))) | ctrl_s_r_valid;
