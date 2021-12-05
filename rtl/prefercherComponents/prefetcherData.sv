@@ -120,6 +120,8 @@ begin
         reqLast_prev <= reqLast;
 
         case (reqOpcode)
+            3'd0: ;//NOP - Do nothing
+
             // readReqPref (Read requests which were initiated by transactions from the prefetching mechanism)
             // Assupmtion: Prefetcher will not demand an existing readReq
             3'd1: begin
