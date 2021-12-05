@@ -3,7 +3,16 @@
 //Assumptions:
 // * When any _valid is up, the data (and meta-data, such as 'id') doesn't change.
 
-module prefetcherTop(
+module prefetcherTop #(
+    parameter ADDR_BITS = 64, //64bit address 2^64
+    parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
+    parameter WATCHDOG_SIZE = 10'd10, // number of bits for the watchdog counter
+    parameter BURST_LEN_WIDTH = 4'd8, //NVDLA max is 3, AXI4 supports up to 8 bits
+    parameter TID_WIDTH = 4'd8, //NVDLA max is 3, AXI4 supports up to 8 bits
+    parameter LOG_BLOCK_DATA_BYTES = 3'd6, //[Bytes]
+    parameter PROMISE_WIDTH = 3'd3, // the log size of the promise's counter
+    localparam BLOCK_DATA_SIZE_BITS = (1<<LOG_BLOCK_DATA_BYTES)<<3 //shift left by 3 to convert Bytes->bits
+)(
     input logic     clk,
     input logic     en, //NOTE: en==1'b1, still need to handle en=1'b0
     input logic     resetN,
@@ -77,7 +86,7 @@ logic pr_r_out_last;
 logic [0:BLOCK_DATA_SIZE_BITS-1] pr_r_out_data;
 logic [0:ADDR_BITS-1] pr_m_ar_addr;
 logic cleanup_st;
-logic sel_pr; // select 0 - DDR direct, 1 - Prefetcher
+logic sel_r_pr, sel_ar_pr; // select 0 - DDR direct, 1 - Prefetcher
 
 logic ctrl_context_valid;
 logic ctrl_s_ar_valid;
@@ -98,8 +107,7 @@ logic ctrl_m_r_ready;
     .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
     .LOG_BLOCK_DATA_BYTES(LOG_BLOCK_DATA_BYTES),
     .ADDR_BITS(ADDR_BITS), 
-    .PROMISE_WIDTH(PROMISE_WIDTH),
-    .BURST_LEN_WIDTH(BURST_LEN_WIDTH)
+    .PROMISE_WIDTH(PROMISE_WIDTH)
   ) prDataPath (
     // inputs
     .clk(clk), 
@@ -112,11 +120,11 @@ logic ctrl_m_r_ready;
     .crs_almostFullSpacer(crs_almostFullSpacer),
     // outputs
     .respData(pr_r_out_data),
-    .respLast(pr_r_out_last),
+    .respLast(pr_r_out_last),//fixme
     .addrHit(pr_addrHit),
     .pr_r_valid(pr_r_valid), 
     .prefetchReqCnt(prefetchReqCnt), 
-    .pr_almostFull(pr_almostFull), 
+    .almostFull(pr_almostFull), 
     .errorCode(errorCode),
     .hasOutstanding(pr_hasOutstanding)
 );
@@ -127,7 +135,6 @@ prefetcherCtrl #(
     .ADDR_BITS(ADDR_BITS),
     .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
     .WATCHDOG_SIZE(WATCHDOG_SIZE),
-    .LOG_BLOCK_DATA_BYTES(LOG_BLOCK_DATA_BYTES),
     .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
     .TID_WIDTH(TID_WIDTH)
 ) prCtrlPath (
@@ -135,18 +142,18 @@ prefetcherCtrl #(
     .en(en), 
     .resetN(resetN), 
     .ctrlFlush(ctrlFlush), 
-    .pr_almostFull(pr_almostFull), 
-    .prefetchReqCnt(prefetchReqCnt), 
-    .pr_r_valid(pr_r_valid), 
+    .pr_flush(pr_flush), 
+    .pr_opCode(pr_opCode), 
     .pr_addrHit(pr_addrHit), 
     .pr_hasOutstanding(pr_hasOutstanding), 
-    .pr_m_ar_addr(pr_m_ar_addr), 
-    .pr_opCode(pr_opCode), 
-    .pr_m_ar_len(pr_m_ar_len), 
-    .pr_m_ar_id(pr_m_ar_id),
-    .pr_flush(pr_flush), 
+    .pr_reqCnt(prefetchReqCnt), 
+    .pr_almostFull(pr_almostFull), 
     .pr_isCleanup(cleanup_st),
     .pr_context_valid(ctrl_context_valid),
+    .pr_r_valid(pr_r_valid), 
+    .pr_m_ar_addr(pr_m_ar_addr), 
+    .pr_m_ar_len(pr_m_ar_len), 
+    .pr_m_ar_id(pr_m_ar_id),
     .s_ar_valid(ctrl_s_ar_valid),
     .s_ar_ready(ctrl_s_ar_ready), 
     .s_ar_len(s_ar_len),
@@ -190,7 +197,7 @@ always_comb begin
     if(sel_ar_pr) begin
         //Path: Master-Prefetcher-Slave
         s_ar_ready = ctrl_s_ar_ready;
-        ctrl_s_ar_valid = s_ar_valid & pr_ar_relevant;
+        ctrl_s_ar_valid = s_ar_valid;
         
         ctrl_m_ar_ready = m_ar_ready;
         m_ar_valid = ctrl_m_ar_valid;
@@ -212,7 +219,7 @@ always_comb begin
     if(sel_r_pr) begin
         //Path: Master-Prefetcher-Slave
         m_r_ready = ctrl_m_r_ready;
-        ctrl_m_r_valid = m_r_valid & pr_r_relevant;
+        ctrl_m_r_valid = m_r_valid;
 
         ctrl_s_r_ready = s_r_ready;
         s_r_valid = ctrl_s_r_valid;
@@ -231,3 +238,4 @@ always_comb begin
         s_r_id = m_r_id;
     end
 end
+endmodule
