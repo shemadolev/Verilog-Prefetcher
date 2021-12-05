@@ -110,6 +110,14 @@ always_ff @(posedge clk or negedge resetN) begin
         pr_flush <= 1'b1;
         ToBit <= 1'b0;
         pr_opCode <= 3'd0;
+        prefetchAddr_valid <= 1'b0;
+        prefetchAddr_reg <= {ADDR_BITS{1'b0}};
+        pr_ar_ack <= 1'b0;
+        //AXI ready/valid signals
+        s_ar_ready <= 1'b0;
+        m_ar_valid <= 1'b0;
+        s_r_valid <= 1'b0;
+        m_r_ready <= 1'b0;
 	end
 	else begin
         if(en) begin
@@ -133,9 +141,9 @@ always_ff @(posedge clk or negedge resetN) begin
             
             pr_m_ar_id <= pr_m_ar_id_next;
             pr_m_ar_len <= pr_m_ar_len_next;
+            pr_m_ar_addr <= pr_m_ar_addr_next;
             
             pr_opCode <= pr_opCode_next;
-            pr_m_ar_addr <= pr_m_ar_addr_next;
             
             s_ar_ready <= s_ar_ready_next;
 
