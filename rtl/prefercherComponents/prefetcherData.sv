@@ -92,7 +92,7 @@ assign burst_len = reqBurstLen + 1;
 assign active = |validVec; //at least one block is valid
 assign respData = dataReady_curBurst ? dataMat[headPtr + burstOffset] : dataMat[headPtr + burst_len + burstOffset]; //Pass data in head/head+1, based on promise&dataValid of head
 assign respLast = lastVec[headPtr + burstOffset];
-assign isFull = (QUEUE_SIZE - validCnt) < {{1'b0},{burst_len}};
+assign isFull = ((QUEUE_SIZE - validCnt) < {{1'b0},{burst_len}}) & active;
 assign isEmpty = ~|validVec;
 assign almostFull = (validCnt + (crs_almostFullSpacer * burst_len)  >= QUEUE_SIZE) & active;
 assign dataReady_curBurst = (validVec[headPtr + burstOffset] && dataValidVec[headPtr + burstOffset] == 1'b1 && promiseCnt[headPtr] > {(PROMISE_WIDTH){1'b0}});
