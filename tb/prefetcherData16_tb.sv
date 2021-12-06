@@ -78,7 +78,7 @@ module prefetcherDataTb ();
         .ADDR_BITS(ADDR_BITS),
         .PROMISE_WIDTH(PROMISE_WIDTH),
         .BURST_LEN_WIDTH(BURST_LEN_WIDTH)
-    ) prefetcherData_dut (
+    ) prefetcherData16_dut (
         .clk(clk),
         .resetN(resetN),
         .reqAddr(reqAddr),
