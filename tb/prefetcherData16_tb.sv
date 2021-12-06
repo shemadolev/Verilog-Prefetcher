@@ -38,7 +38,7 @@ $display(" ** Resp data **"); \
 $display(" pr_r_valid:%b respData:0x%h respLast:%b", MOD.pr_r_valid, MOD.respData, MOD.respLast); \
 $display("------- END Prefetcher State --------")
 
-module prefetcherDataTb ();
+module prefetcherData16Tb ();
 
     localparam LOG_QUEUE_SIZE = 4; // the size of the queue [2^x] 
     localparam QUEUE_SIZE = 1<<LOG_QUEUE_SIZE;
@@ -78,7 +78,7 @@ module prefetcherDataTb ();
         .ADDR_BITS(ADDR_BITS),
         .PROMISE_WIDTH(PROMISE_WIDTH),
         .BURST_LEN_WIDTH(BURST_LEN_WIDTH)
-    ) prefetcherData_dut (
+    ) prefetcherData16_dut (
         .clk(clk),
         .resetN(resetN),
         .reqAddr(reqAddr),
