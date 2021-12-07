@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 module findValueIdx #(
     parameter LOG_VEC_SIZE = 4'd8,
     parameter VEC_SIZE = 1<<LOG_VEC_SIZE,
@@ -28,3 +31,4 @@ module findValueIdx #(
     assign matchIdx = highbitRes[LOG_VEC_SIZE-1:0];
 
 endmodule
+`resetall

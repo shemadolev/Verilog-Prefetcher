@@ -10,6 +10,9 @@
                 * errorCode:
                     0 - no error, 1 - Invalid opcode, 2 - ReadReq to full queue, 3 - Requesting data read when not ready, 4 - Read data overflow
  */
+`resetall
+`timescale 1ns / 1ps
+
 module	prefetcherData #(
     parameter LOG_QUEUE_SIZE = 4'd8, // the size of the queue [2^x] 
     localparam [0:LOG_QUEUE_SIZE] QUEUE_SIZE = 1<<LOG_QUEUE_SIZE,
@@ -202,5 +205,7 @@ begin
 end
 
 endmodule
+
+`resetall
 
 //todo throw error if getting 'data read' when not expected (validVec[readDataPtr] == 0)

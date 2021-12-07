@@ -2,6 +2,9 @@
 // The output vector is cyclic, meaning the tail can be smaller than the head.
 //Note: If tailPtr == headPtr, a vector of all 1's will be returned (because assuming cyclic vector array)
 
+`resetall
+`timescale 1ns / 1ps
+
 module vectorMask #(
     parameter LOG_WIDTH = 4'd8,
     parameter WIDTH = 1<<LOG_WIDTH
@@ -35,3 +38,5 @@ module vectorMask #(
     assign outMask = tailIsLeading ? maskVec : ~maskVec;
 
 endmodule
+
+`resetall

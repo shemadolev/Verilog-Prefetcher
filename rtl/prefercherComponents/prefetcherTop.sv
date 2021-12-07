@@ -3,6 +3,9 @@
 //Assumptions:
 // * When any _valid is up, the data (and meta-data, such as 'id') doesn't change.
 
+`resetall
+`timescale 1ns / 1ps
+
 module prefetcherTop #(
     parameter ADDR_BITS = 64, //64bit address 2^64
     parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
@@ -239,3 +242,4 @@ always_comb begin
     end
 end
 endmodule
+`resetall

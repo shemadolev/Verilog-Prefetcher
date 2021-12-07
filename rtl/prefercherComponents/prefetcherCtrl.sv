@@ -1,5 +1,8 @@
 //Notes: On flush, reset the stride FSM; If stride changes, do nothing (if we'll get hit in MOQ, blocks will pop out, else timeout will expire)
 
+`resetall
+`timescale 1ns / 1ps
+
 module prefetcherCtrl #(
     parameter ADDR_BITS = 64, //64bit address 2^64
     parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
@@ -321,4 +324,4 @@ assign valid_burst = ~|({{(BURST_LEN_WIDTH - LOG_QUEUE_SIZE + 1){1'b1}},{(LOG_QU
 
 endmodule
 
-
+`resetall

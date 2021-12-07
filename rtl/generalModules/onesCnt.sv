@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 module onesCnt#(
     parameter LOG_VEC_SIZE = 4,
     parameter VEC_SIZE = 1<<LOG_VEC_SIZE
@@ -17,3 +20,4 @@ begin
 end
 
 endmodule
+`resetall

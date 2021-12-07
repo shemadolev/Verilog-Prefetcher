@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 module  clkDivN #(
 	parameter WIDTH = 10'd10
 )(  
@@ -34,3 +37,5 @@ begin
     end
 end
 endmodule
+
+`resetall
