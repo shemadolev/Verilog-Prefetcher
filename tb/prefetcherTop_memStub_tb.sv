@@ -74,9 +74,9 @@ $display("------- END Control --------")
 
 `define printMem(MOD) \
 for (i = 0; i < 2**VALID_ADDR_WIDTH; i = i + 2**(VALID_ADDR_WIDTH/2)) begin \
-        for (j = i; j < i + 2**(VALID_ADDR_WIDTH/2); j = j + 1) begin \
-            $display("0x%h : 0x%h",j,MOD.mem[j]); \
-        end \ 
+    for (j = i; j < i + 2**(VALID_ADDR_WIDTH/2); j = j + 1) begin \
+        $display("0x%h : 0x%h",j,MOD.mem[j]); \
+    end \
 end 
 
 module prefetcherTop__memStub_tb();
