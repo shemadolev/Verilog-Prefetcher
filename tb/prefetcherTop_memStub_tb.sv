@@ -71,90 +71,94 @@
 
     module prefetcherTop__memStub_tb();
 
-    localparam ADDR_WIDTH = 6; 
-    localparam ADDR_BITS = 1<<ADDR_WIDTH; 
+    localparam ADDR_SIZE_ENCODE = 6; 
+    localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
     localparam QUEUE_WIDTH = 3'd3; 
     localparam WATCHDOG_SIZE = 10'd10; 
     localparam BURST_LEN_WIDTH = 4'd8; 
-    localparam TID_WIDTH = 4'd8; 
-    localparam BLOCK_DATA_WIDTH = 3'd0;
+    localparam ID_WIDTH = 4'd8; 
+    localparam DATA_SIZE_ENCODE = 3'd0;
+    localparam DATA_WIDTH = (1<<DATA_SIZE_ENCODE)<<3;
+    localparam STRB_WIDTH = (DATA_WIDTH/8);
     localparam PROMISE_WIDTH = 3'd3; 
-    localparam BLOCK_DATA = (1<<BLOCK_DATA_WIDTH)<<3;
     localparam PIPELINE_OUTPUT = 0;
 
+    //########### prefetcherTop ###########//
+        // + axi signals (prefetcher<->DDR)
     logic                       clk;
     logic                       en; 
     logic                       resetN;
     logic                       s_ar_valid;
     logic                       s_ar_ready;
     logic [0:BURST_LEN_WIDTH-1] s_ar_len;
-    logic [0:ADDR_BITS-1]       s_ar_addr; 
-    logic [0:TID_WIDTH-1]       s_ar_id;
+    logic [0:ADDR_WIDTH-1]       s_ar_addr; 
+    logic [0:ID_WIDTH-1]       s_ar_id;
     logic                       m_ar_valid;
     logic                       m_ar_ready;
     logic [0:BURST_LEN_WIDTH-1] m_ar_len;
-    logic [0:ADDR_BITS-1]       m_ar_addr;
-    logic [0:TID_WIDTH-1]       m_ar_id;
+    logic [0:ADDR_WIDTH-1]       m_ar_addr;
+    logic [0:ID_WIDTH-1]       m_ar_id;
     logic                       s_r_valid;
     logic                       s_r_ready;
     logic                       s_r_last;
-    logic [0:BLOCK_DATA-1]      s_r_data;
-    logic [0:TID_WIDTH-1]       s_r_id;
+    logic [0:DATA_WIDTH-1]      s_r_data;
+    logic [0:ID_WIDTH-1]       s_r_id;
     logic                       m_r_valid;
     logic                       m_r_ready;
     logic                       m_r_last;
-    logic [0:BLOCK_DATA-1]      m_r_data;
-    logic [0:TID_WIDTH-1]       m_r_id;
+    logic [0:DATA_WIDTH-1]      m_r_data;
+    logic [0:ID_WIDTH-1]       m_r_id;
     logic                       s_aw_valid;
     logic                       s_aw_ready;
-    logic [0:ADDR_BITS-1]       s_aw_addr;
-    logic [0:TID_WIDTH-1]       s_aw_id;
+    logic [0:ADDR_WIDTH-1]       s_aw_addr;
+    logic [0:ID_WIDTH-1]       s_aw_id;
     logic                       m_aw_valid;
     logic                       m_aw_ready;
-    logic [0:ADDR_BITS-1]       bar;
-    logic [0:ADDR_BITS-1]       limit;
+    logic [0:ADDR_WIDTH-1]       bar;
+    logic [0:ADDR_WIDTH-1]       limit;
     logic [0:QUEUE_WIDTH]       windowSize;
     logic [0:WATCHDOG_SIZE-1]   watchdogCnt; 
     logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
     logic [0:2]                 errorCode;
 
-    // axi-dram ////////////////////////////////////
-    wire                   rst,
+    //########### axi-dram ###########//
+    wire                   rst;
     
-    wire [TID_WIDTH-1:0]   s_axi_awid,
-    wire [ADDR_WIDTH-1:0]  s_axi_awaddr,
-    wire [7:0]             s_axi_awlen,
-    wire [2:0]             s_axi_awsize,
-    wire [1:0]             s_axi_awburst,
-    wire                   s_axi_awlock,
-    wire [3:0]             s_axi_awcache,
-    wire [2:0]             s_axi_awprot,
-    wire [DATA_WIDTH-1:0]  s_axi_wdata,
-    wire [STRB_WIDTH-1:0]  s_axi_wstrb,
-    wire                   s_axi_wlast,
-    wire                   s_axi_wvalid,
-    wire                   s_axi_wready,
-    wire [TID_WIDTH-1:0]   s_axi_bid,
-    wire [1:0]             s_axi_bresp,
-    wire                   s_axi_bvalid,
-    wire                   s_axi_bready,
- 
-    //TODO assign with constants
-    wire [2:0]             s_axi_arsize,
-    wire [1:0]             s_axi_arburst,
-    wire                   s_axi_arlock,
-    wire [3:0]             s_axi_arcache,
-    wire [2:0]             s_axi_arprot,
+    //These are not checked, assign some contants for valid/ready
+    wire [ADDR_WIDTH-1:0]  s_axi_awaddr;
+    wire [7:0]             s_axi_awlen;
+    // wire [2:0]             s_axi_awsize;
+    // wire [1:0]             s_axi_awburst;
+    // wire                   s_axi_awlock;
+    // wire [3:0]             s_axi_awcache;
+    // wire [2:0]             s_axi_awprot;
+    wire [DATA_WIDTH-1:0]  s_axi_wdata;
+    wire [STRB_WIDTH-1:0]  s_axi_wstrb;
+    wire                   s_axi_wlast;
+    wire                   s_axi_wvalid;
+    wire                   s_axi_wready;
+    
+    wire [ID_WIDTH-1:0]    s_axi_bid;
+    wire [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error can be sent
+    wire                   s_axi_bvalid;
+    wire                   s_axi_bready;
 
-    wire [1:0]             s_axi_rresp,
+    //todo Assign constant values:
+    // wire [2:0]             s_axi_arsize;
+    // wire [1:0]             s_axi_arburst;
+    // wire                   s_axi_arlock;
+    // wire [3:0]             s_axi_arcache;
+    // wire [2:0]             s_axi_arprot;
+
+    wire [1:0]             s_axi_rresp;
 
     prefetcherTop #(
-    .ADDR_BITS(ADDR_BITS),
+    .ADDR_BITS(ADDR_WIDTH),
     .LOG_QUEUE_SIZE(QUEUE_WIDTH),
     .WATCHDOG_SIZE(WATCHDOG_SIZE),
     .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
-    .TID_WIDTH(TID_WIDTH),
-    .LOG_BLOCK_DATA_BYTES(BLOCK_DATA_WIDTH),
+    .TID_WIDTH(ID_WIDTH),
+    .LOG_BLOCK_DATA_BYTES(DATA_SIZE_ENCODE),
     .PROMISE_WIDTH(PROMISE_WIDTH)
     ) prefetcherTop_dut (
         .clk(clk),
@@ -195,26 +199,26 @@
     );
 
     axi_ram #
-    (//todo
+    (
         // Width of data bus in bits
-        .DATA_WIDTH(BLOCK_DATA_WIDTH),
+        .DATA_WIDTH(DATA_WIDTH),
         // Width of address bus in bits
         .ADDR_WIDTH(ADDR_WIDTH),
         // Width of ID signal
-        .ID_WIDTH(TID_WIDTH),
+        .ID_WIDTH(ID_WIDTH),
         // Extra pipeline register on output
         .PIPELINE_OUTPUT(PIPELINE_OUTPUT)
     ) axi_ram_inst (
         .clk(clk),
         .rst(rst),
-        .s_axi_awid(s_axi_awid),
+        .s_axi_awid(s_aw_id),
         .s_axi_awaddr(s_axi_awaddr),
         .s_axi_awlen(s_axi_awlen),
-        .s_axi_awsize(s_axi_awsize),
-        .s_axi_awburst(s_axi_awburst),
-        .s_axi_awlock(s_axi_awlock),
-        .s_axi_awcache(s_axi_awcache),
-        .s_axi_awprot(s_axi_awprot),
+        .s_axi_awsize(DATA_SIZE_ENCODE),
+        .s_axi_awburst(2'b01),
+        .s_axi_awlock(1'b0), //Irrelevant when accessing a single port
+        .s_axi_awcache(4'b0000),
+        .s_axi_awprot(3'b000),
         .s_axi_awvalid(m_aw_valid),
         .s_axi_awready(m_aw_ready),
         .s_axi_wdata(s_axi_wdata),
@@ -229,24 +233,33 @@
         .s_axi_arid(m_ar_id),// read request
         .s_axi_araddr(m_ar_addr),
         .s_axi_arlen(m_ar_len),
-        .s_axi_arsize(s_axi_arsize), //fixme - constant?
-        .s_axi_arburst(s_axi_arburst), //fixme - constant?
-        .s_axi_arlock(s_axi_arlock), //fixme - constant?
-        .s_axi_arcache(s_axi_arcache), //fixme - constant?
-        .s_axi_arprot(s_axi_arprot), //fixme - constant?
+        .s_axi_arsize(DATA_SIZE_ENCODE),
+        .s_axi_arburst(2'b01), //INC burst type, the only type supported by NVDLA
+        .s_axi_arlock(1'b0), //Irrelevant when accessing a single port
+        .s_axi_arcache(4'b0000), // Irrelevant, used for caching attributes
+        .s_axi_arprot(3'b000), // Irrelevant, used for access premissions 
         .s_axi_arvalid(m_ar_valid),
         .s_axi_arready(m_ar_ready),
         .s_axi_rid(m_r_id), //read data
         .s_axi_rdata(m_r_data),
-        .s_axi_rresp(s_axi_rresp), //fixme - constant?
+        .s_axi_rresp(s_axi_rresp),
         .s_axi_rlast(m_r_last),
         .s_axi_rvalid(m_r_valid),
         .s_axi_rready(m_r_ready)
     );
 
-     //fixme - constants on b/w/aw signals
-
 assign rst = ~resetN;
+
+// commented wires - assign on tests
+
+// assign s_axi_awaddr = ;
+// assign s_axi_awlen = ;
+assign s_axi_wstrb = {STRB_WIDTH{1'b1}};
+// assign s_axi_wdata = ;
+// assign s_axi_wlast = ;
+// assign s_axi_wvalid = ; 
+assign s_axi_bready = 1'b1;
+
 
     initial begin
         localparam BASE_ADDR = 64'hdeadbeef;
@@ -265,65 +278,71 @@ assign rst = ~resetN;
             // Data
         crs_almostFullSpacer=2;
 
-        m_r_valid=0;
+        s_ar_valid = 0;
+        s_r_ready  = 0;
+        s_aw_valid = 0;
 
+        // for (int i=0; i<10; i++) begin
+            // s_ar_addr = BASE_ADDR + i*64;
+        `tick(clk);
+
+        s_ar_valid = 1'b1;
+        s_ar_addr = BASE_ADDR;
         s_ar_len=3;
         s_ar_id=5;
 
-        //NVDLA AR check
-
-        s_ar_valid = 1'b1;
-        m_ar_ready = 0;
-        s_r_ready = 0;
-        m_r_valid = 0;
-        s_aw_valid =0;
-        m_aw_ready = 0;
-
-        for (int i=0; i<10; i++) begin
-            m_ar_ready = 1;
-            // s_ar_addr = BASE_ADDR + i*64;
-            s_ar_addr = BASE_ADDR;
+        `tick(clk);
+        while(~(s_ar_valid & s_ar_ready))
             `tick(clk);
-            $display("\n\n~~~~~~~    Cycle %d",i);
-            `printTop(prefetcherTop_dut);
-            `printCtrl(prefetcherTop_dut.prCtrlPath);
-            `printData(prefetcherTop_dut.prDataPath);
-        end
+
+        $display("\n~~~~~~~   1. After read req of addr 0x%h",s_ar_addr);
+        `printTop(prefetcherTop_dut);
+        `printCtrl(prefetcherTop_dut.prCtrlPath);
+        `printData(prefetcherTop_dut.prDataPath);
         
-        //DDR R check 
-        s_ar_valid = 0;
-        m_ar_ready = 1;
-        s_r_ready = 0;
-        m_r_valid = 0;
-        s_aw_valid =0;
-        m_aw_ready = 0;
-
-        while(~(m_r_ready & m_r_valid)) begin
-            m_r_valid = 1;
-            m_r_id = 5;
-            m_r_last = 1'b1;
-            m_r_data = 42;
-            $display("\n~~~~ Data read cycle");
-            `printTop(prefetcherTop_dut);
-            `printCtrl(prefetcherTop_dut.prCtrlPath);
-            `printData(prefetcherTop_dut.prDataPath);
+        while(~s_r_valid)
             `tick(clk);
-        end
-        $display("\n~~~~ m_r_ready == 1");
-        `printTop(prefetcherTop_dut);
-        `printCtrl(prefetcherTop_dut.prCtrlPath);
-        `printData(prefetcherTop_dut.prDataPath);
+
         `tick(clk);
-        m_r_valid = 0;
-        $display("\n~~~~ opCode == 3");
+        $display("\n~~~~~~~   2. s_r_valid == 1");
         `printTop(prefetcherTop_dut);
         `printCtrl(prefetcherTop_dut.prCtrlPath);
         `printData(prefetcherTop_dut.prDataPath);
-        `tick(clk);
-        $display("\n~~~~ SUCCESS in data read");
-        `printTop(prefetcherTop_dut);
-        `printCtrl(prefetcherTop_dut.prCtrlPath);
-        `printData(prefetcherTop_dut.prDataPath);
+
+        // //DDR R check 
+        // s_ar_valid = 0;
+        // m_ar_ready = 1;
+        // s_r_ready = 0;
+        // m_r_valid = 0;
+        // s_aw_valid =0;
+        // m_aw_ready = 0;
+
+        // while(~(m_r_ready & m_r_valid)) begin
+        //     m_r_valid = 1;
+        //     m_r_id = 5;
+        //     m_r_last = 1'b1;
+        //     m_r_data = 42;
+        //     $display("\n~~~~ Data read cycle");
+        //     `printTop(prefetcherTop_dut);
+        //     `printCtrl(prefetcherTop_dut.prCtrlPath);
+        //     `printData(prefetcherTop_dut.prDataPath);
+        //     `tick(clk);
+        // end
+        // $display("\n~~~~ m_r_ready == 1");
+        // `printTop(prefetcherTop_dut);
+        // `printCtrl(prefetcherTop_dut.prCtrlPath);
+        // `printData(prefetcherTop_dut.prDataPath);
+        // `tick(clk);
+        // m_r_valid = 0;
+        // $display("\n~~~~ opCode == 3");
+        // `printTop(prefetcherTop_dut);
+        // `printCtrl(prefetcherTop_dut.prCtrlPath);
+        // `printData(prefetcherTop_dut.prDataPath);
+        // `tick(clk);
+        // $display("\n~~~~ SUCCESS in data read");
+        // `printTop(prefetcherTop_dut);
+        // `printCtrl(prefetcherTop_dut.prCtrlPath);
+        // `printData(prefetcherTop_dut.prDataPath);
         
         $stop;
     end
