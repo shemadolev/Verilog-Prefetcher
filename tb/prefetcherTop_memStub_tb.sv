@@ -273,8 +273,8 @@ initial begin
     clk <= '0;
     forever begin
         #(clock_period/2) begin
-            clk=~clk;
-            clk_prev <= clk;
+            clk_prev = clk;
+            clk = ~clk;
         end
     end
 end
@@ -311,7 +311,7 @@ initial begin
     s_aw_addr = BASE_ADDR;
     s_aw_id = 5;
     s_axi_awlen = 8'd0;
-    while(posedge_clk & ~(s_aw_valid & s_aw_ready)) begin
+    while(~(posedge_clk & s_aw_valid & s_aw_ready)) begin
         #5;
     end
     #5;
@@ -321,7 +321,7 @@ initial begin
     s_axi_wvalid = 1'b1;
     s_axi_wdata = 8'd1;
     s_axi_wlast = 1'b1;
-    while(posedge_clk & ~(s_axi_wvalid & s_axi_wready)) begin
+    while(~(posedge_clk & s_axi_wvalid & s_axi_wready)) begin
         #5;
     end
     #5;
@@ -335,7 +335,7 @@ initial begin
     s_ar_id=5;
 
     // #5;
-    while(posedge_clk & ~(s_ar_valid & s_ar_ready)) begin
+    while(~(posedge_clk & s_ar_valid & s_ar_ready)) begin
         #5;
     end
     #5;
@@ -347,7 +347,7 @@ initial begin
     `printCtrl(prefetcherTop_dut.prCtrlPath);
     `printData(prefetcherTop_dut.prDataPath);
     
-    while(posedge_clk & ~s_r_valid) begin
+    while(~(posedge_clk & s_r_valid)) begin
         #5;
     end
 
