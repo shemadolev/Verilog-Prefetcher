@@ -281,7 +281,7 @@ end
 
 localparam timeout=1000;
 initial begin
-    #(timeout) $finish
+    #(timeout) $finish;
 end
 
 initial begin
