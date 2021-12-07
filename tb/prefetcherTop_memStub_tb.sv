@@ -7,14 +7,14 @@ clk=0; \
 clk=1; \
 #1
 
-`define printTop(MOD) #1; \
+`define printTop(MOD) \
 $display("------- BEGIN Top --------"); \
 $display("  sel_ar_pr %b",MOD.sel_ar_pr); \
 $display("  sel_r_pr %b",MOD.sel_r_pr); \
 $display("  ctrlFlush %b",MOD.ctrlFlush); \
 $display("------- END Top --------")
 
-`define printData(MOD) #1; \
+`define printData(MOD)  \
 $display("------- BEGIN Data --------"); \
 $display("  opCode %d",MOD.reqOpcode); \
 $display("  almostFull %b",MOD.almostFull); \
@@ -49,7 +49,7 @@ $display(" ** Resp data **"); \
 $display(" pr_r_valid:%b respData:0x%h respLast:%b", MOD.pr_r_valid, MOD.respData, MOD.respLast); \
 $display("------- END Data --------")
 
-`define printCtrl(MOD) #1; \
+`define printCtrl(MOD)  \
 $display("------- BEGIN Control --------"); \
 $display("  en %b",MOD.en); \
 $display("  st_pr_cur \t%s",MOD.st_pr_cur.name); \
@@ -72,9 +72,16 @@ if(MOD.prefetchAddr_valid) \
     $display("  prefetchAddr_reg 0x%h",MOD.prefetchAddr_reg); \
 $display("------- END Control --------")
 
+`define printMem(MOD) \
+for (i = 0; i < 2**VALID_ADDR_WIDTH; i = i + 2**(VALID_ADDR_WIDTH/2)) begin \
+        for (j = i; j < i + 2**(VALID_ADDR_WIDTH/2); j = j + 1) begin \
+            $display("0x%h : 0x%h",j,MOD.mem[j]); \
+        end \ 
+end 
+
 module prefetcherTop__memStub_tb();
 
-localparam ADDR_SIZE_ENCODE = 6; 
+localparam ADDR_SIZE_ENCODE = 1; //4 addresses 
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
 localparam QUEUE_WIDTH = 3'd3; 
 localparam WATCHDOG_SIZE = 10'd10; 
@@ -86,6 +93,7 @@ localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd3; 
 localparam PIPELINE_OUTPUT = 0;
 
+localparam VALID_ADDR_WIDTH = ADDR_WIDTH - $clog2(STRB_WIDTH);
 //########### prefetcherTop ###########//
     // + axi signals (prefetcher<->DDR)
 logic                       clk;
@@ -281,15 +289,17 @@ initial begin
         // Data
     crs_almostFullSpacer=2;
 
+    s_aw_valid = 0;
+    s_w_valid = 0;
     s_ar_valid = 0;
     s_r_ready  = 0;
-    s_aw_valid = 0;
+    s_axi_wvalid = 0;
 
     //Write req to BASE_ADDR
     s_aw_valid = 1'b1;
     s_aw_addr = BASE_ADDR;
     s_aw_id = 5;
-    s_axi_awlen = 8'd1;
+    s_axi_awlen = 8'd0;
     while(~(s_aw_valid & s_aw_ready)) begin
         `tick(clk);
     end
@@ -310,7 +320,7 @@ initial begin
     //Read req of BASE_ADDR
     s_ar_valid = 1'b1;
     s_ar_addr = BASE_ADDR;
-    s_ar_len=1;
+    s_ar_len=0;
     s_ar_id=5;
 
     // `tick(clk);
