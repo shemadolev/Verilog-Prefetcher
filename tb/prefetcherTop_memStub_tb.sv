@@ -298,7 +298,9 @@ initial begin
     while(~(s_ar_valid & s_ar_ready)) begin
         `tick(clk);
     end
-
+    
+    s_ar_valid = 1'b0;
+    
     $display("\n~~~~~~~   1. After read req of addr 0x%h",s_ar_addr);
     `printTop(prefetcherTop_dut);
     `printCtrl(prefetcherTop_dut.prCtrlPath);
