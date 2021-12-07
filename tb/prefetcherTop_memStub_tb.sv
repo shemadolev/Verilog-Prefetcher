@@ -290,7 +290,6 @@ initial begin
     crs_almostFullSpacer=2;
 
     s_aw_valid = 0;
-    s_w_valid = 0;
     s_ar_valid = 0;
     s_r_ready  = 0;
     s_axi_wvalid = 0;
@@ -345,41 +344,6 @@ initial begin
     `printTop(prefetcherTop_dut);
     `printCtrl(prefetcherTop_dut.prCtrlPath);
     `printData(prefetcherTop_dut.prDataPath);
-
-    // //DDR R check 
-    // s_ar_valid = 0;
-    // m_ar_ready = 1;
-    // s_r_ready = 0;
-    // m_r_valid = 0;
-    // s_aw_valid =0;
-    // m_aw_ready = 0;
-
-    // while(~(m_r_ready & m_r_valid)) begin
-    //     m_r_valid = 1;
-    //     m_r_id = 5;
-    //     m_r_last = 1'b1;
-    //     m_r_data = 42;
-    //     $display("\n~~~~ Data read cycle");
-    //     `printTop(prefetcherTop_dut);
-    //     `printCtrl(prefetcherTop_dut.prCtrlPath);
-    //     `printData(prefetcherTop_dut.prDataPath);
-    //     `tick(clk);
-    // end
-    // $display("\n~~~~ m_r_ready == 1");
-    // `printTop(prefetcherTop_dut);
-    // `printCtrl(prefetcherTop_dut.prCtrlPath);
-    // `printData(prefetcherTop_dut.prDataPath);
-    // `tick(clk);
-    // m_r_valid = 0;
-    // $display("\n~~~~ opCode == 3");
-    // `printTop(prefetcherTop_dut);
-    // `printCtrl(prefetcherTop_dut.prCtrlPath);
-    // `printData(prefetcherTop_dut.prDataPath);
-    // `tick(clk);
-    // $display("\n~~~~ SUCCESS in data read");
-    // `printTop(prefetcherTop_dut);
-    // `printCtrl(prefetcherTop_dut.prCtrlPath);
-    // `printData(prefetcherTop_dut.prDataPath);
     
     $stop;
 end
