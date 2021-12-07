@@ -1,12 +1,6 @@
 `resetall
 `timescale 1ns / 1ps
 
-`define tick(clk) \
-clk=1; \
-#1; \
-clk=0; \
-#1
-
 `define printTop(MOD) \
 $display("------- BEGIN Top --------"); \
 $display("  sel_ar_pr %b",MOD.sel_ar_pr); \
@@ -272,13 +266,18 @@ assign s_axi_wstrb = {STRB_WIDTH{1'b1}};
 assign s_axi_bready = 1'b1;
 
 
+localparam clock_period=20;
+always 
+#(clock_period/2) clk=~clk;
+
 initial begin
     localparam BASE_ADDR = 64'hdeadbeef;
     resetN=0;
+    clk = 0;
     en = 1;
     // watchdogCnt = 10'd1000;
 
-    `tick(clk);
+    #5;
     resetN=1;
 //CR Space
         // Ctrl
@@ -300,9 +299,9 @@ initial begin
     s_aw_id = 5;
     s_axi_awlen = 8'd0;
     while(~(s_aw_valid & s_aw_ready)) begin
-        `tick(clk);
+        #5;
     end
-    `tick(clk);
+    #5;
     s_aw_valid = 1'b0;
 
     //Write data
@@ -310,9 +309,9 @@ initial begin
     s_axi_wdata = 8'd1;
     s_axi_wlast = 1'b1;
     while(~(s_axi_wvalid & s_axi_wready)) begin
-        `tick(clk);
+        #5;
     end
-    `tick(clk);
+    #5;
     s_axi_wvalid = 1'b0;
     //Write response (B) should be returned, but not caught
 
@@ -322,11 +321,11 @@ initial begin
     s_ar_len=0;
     s_ar_id=5;
 
-    // `tick(clk);
+    // #5;
     while(~(s_ar_valid & s_ar_ready)) begin
-        `tick(clk);
+        #5;
     end
-    `tick(clk);
+    #5;
     
     s_ar_valid = 1'b0;
     
@@ -336,10 +335,10 @@ initial begin
     `printData(prefetcherTop_dut.prDataPath);
     
     while(~s_r_valid) begin
-        `tick(clk);
+        #5;
     end
 
-    `tick(clk);
+    #5;
     $display("\n~~~~~~~   2. s_r_valid == 1");
     `printTop(prefetcherTop_dut);
     `printCtrl(prefetcherTop_dut.prCtrlPath);
