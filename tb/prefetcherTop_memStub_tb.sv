@@ -2,9 +2,9 @@
 `timescale 1ns / 1ps
 
 `define tick(clk) \
-clk=0; \
-#1; \
 clk=1; \
+#1; \
+clk=0; \
 #1
 
 `define printTop(MOD) \
