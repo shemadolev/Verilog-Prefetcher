@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 `define tick(clk) \
 clk=0; \
 #1; \
@@ -270,3 +273,4 @@ module prefetcherData16Tb ();
         $stop;
     end
 endmodule
+`resetall

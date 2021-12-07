@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 module highBitTb ();
 
 localparam OUT_WIDTH = 4;
@@ -45,3 +48,4 @@ initial begin
 end
 
 endmodule
+`resetall

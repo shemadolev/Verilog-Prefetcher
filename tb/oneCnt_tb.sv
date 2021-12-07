@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 module oneCntTb ();
 
 localparam LOG_VEC_SIZE = 2'd3;
@@ -40,3 +43,4 @@ initial begin
 end
 
 endmodule
+`resetall

@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 `define tick(clk) \
 clk=0; \
 #1; \
@@ -190,3 +193,4 @@ module prefetcherDataTb ();
     end
 
 endmodule
+`resetall

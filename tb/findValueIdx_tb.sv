@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 module findValueTb ();
 
     localparam LOG_VEC_SIZE = 3'd3;
@@ -82,3 +85,4 @@ initial begin
 end
 
 endmodule
+`resetall

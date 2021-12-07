@@ -1,3 +1,6 @@
+`resetall
+`timescale 1ns / 1ps
+
 module clkDivNTb ();
 
 localparam WIDTH = 5;
@@ -101,3 +104,5 @@ initial begin
     $stop;
 end
 endmodule
+
+`resetall
