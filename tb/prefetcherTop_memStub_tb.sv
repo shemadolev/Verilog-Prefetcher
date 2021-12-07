@@ -267,13 +267,26 @@ assign s_axi_bready = 1'b1;
 
 
 localparam clock_period=20;
-always 
-#(clock_period/2) clk=~clk;
+logic posedge_clk, clk_prev;
+assign posedge_clk = clk & ~clk_prev;
+initial begin
+    clk <= '0;
+    forever begin
+        #(clock_period/2) begin
+            clk=~clk;
+            clk_prev <= clk;
+        end
+    end
+end
+
+localparam timeout=1000;
+initial begin
+    #(timeout) $finish
+end
 
 initial begin
     localparam BASE_ADDR = 64'hdeadbeef;
     resetN=0;
-    clk = 0;
     en = 1;
     // watchdogCnt = 10'd1000;
 
@@ -298,7 +311,7 @@ initial begin
     s_aw_addr = BASE_ADDR;
     s_aw_id = 5;
     s_axi_awlen = 8'd0;
-    while(~(s_aw_valid & s_aw_ready)) begin
+    while(posedge_clk & ~(s_aw_valid & s_aw_ready)) begin
         #5;
     end
     #5;
@@ -308,7 +321,7 @@ initial begin
     s_axi_wvalid = 1'b1;
     s_axi_wdata = 8'd1;
     s_axi_wlast = 1'b1;
-    while(~(s_axi_wvalid & s_axi_wready)) begin
+    while(posedge_clk & ~(s_axi_wvalid & s_axi_wready)) begin
         #5;
     end
     #5;
@@ -322,7 +335,7 @@ initial begin
     s_ar_id=5;
 
     // #5;
-    while(~(s_ar_valid & s_ar_ready)) begin
+    while(posedge_clk & ~(s_ar_valid & s_ar_ready)) begin
         #5;
     end
     #5;
@@ -334,7 +347,7 @@ initial begin
     `printCtrl(prefetcherTop_dut.prCtrlPath);
     `printData(prefetcherTop_dut.prDataPath);
     
-    while(~s_r_valid) begin
+    while(posedge_clk & ~s_r_valid) begin
         #5;
     end
 
