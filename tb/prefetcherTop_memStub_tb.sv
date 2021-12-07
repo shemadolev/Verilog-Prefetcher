@@ -295,16 +295,18 @@ initial begin
     s_ar_id=5;
 
     `tick(clk);
-    while(~(s_ar_valid & s_ar_ready))
+    while(~(s_ar_valid & s_ar_ready)) begin
         `tick(clk);
+    end
 
     $display("\n~~~~~~~   1. After read req of addr 0x%h",s_ar_addr);
     `printTop(prefetcherTop_dut);
     `printCtrl(prefetcherTop_dut.prCtrlPath);
     `printData(prefetcherTop_dut.prDataPath);
     
-    while(~s_r_valid)
+    while(~s_r_valid) begin
         `tick(clk);
+    end
 
     `tick(clk);
     $display("\n~~~~~~~   2. s_r_valid == 1");
