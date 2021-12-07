@@ -255,7 +255,7 @@ assign rst = ~resetN;
 
 // commented wires - assign on tests
 
-// assign s_axi_awaddr = ;
+assign s_axi_awaddr = s_aw_addr;
 // assign s_axi_awlen = ;
 assign s_axi_wstrb = {STRB_WIDTH{1'b1}};
 // assign s_axi_wdata = ;
@@ -285,19 +285,39 @@ initial begin
     s_r_ready  = 0;
     s_aw_valid = 0;
 
-    // for (int i=0; i<10; i++) begin
-        // s_ar_addr = BASE_ADDR + i*64;
+    //Write req to BASE_ADDR
+    s_aw_valid = 1'b1;
+    s_aw_addr = BASE_ADDR;
+    s_aw_id = 5;
+    s_axi_awlen = 8'd1;
+    while(~(s_aw_valid & s_aw_ready)) begin
+        `tick(clk);
+    end
     `tick(clk);
+    s_aw_valid = 1'b0;
 
+    //Write data
+    s_axi_wvalid = 1'b1;
+    s_axi_wdata = 8'd1;
+    s_axi_wlast = 1'b1;
+    while(~(s_axi_wvalid & s_axi_wready)) begin
+        `tick(clk);
+    end
+    `tick(clk);
+    s_axi_wvalid = 1'b0;
+    //Write response (B) should be returned, but not caught
+
+    //Read req of BASE_ADDR
     s_ar_valid = 1'b1;
     s_ar_addr = BASE_ADDR;
-    s_ar_len=3;
+    s_ar_len=1;
     s_ar_id=5;
 
-    `tick(clk);
+    // `tick(clk);
     while(~(s_ar_valid & s_ar_ready)) begin
         `tick(clk);
     end
+    `tick(clk);
     
     s_ar_valid = 1'b0;
     
