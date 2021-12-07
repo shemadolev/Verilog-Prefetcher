@@ -125,35 +125,35 @@ logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
 
 //########### axi-dram ###########//
-wire                   rst;
+logic                   rst;
 
 //These are not checked, assign some contants for valid/ready
-wire [ADDR_WIDTH-1:0]  s_axi_awaddr;
-wire [7:0]             s_axi_awlen;
-// wire [2:0]             s_axi_awsize;
-// wire [1:0]             s_axi_awburst;
-// wire                   s_axi_awlock;
-// wire [3:0]             s_axi_awcache;
-// wire [2:0]             s_axi_awprot;
-wire [DATA_WIDTH-1:0]  s_axi_wdata;
-wire [STRB_WIDTH-1:0]  s_axi_wstrb;
-wire                   s_axi_wlast;
-wire                   s_axi_wvalid;
-wire                   s_axi_wready;
+logic [ADDR_WIDTH-1:0]  s_axi_awaddr;
+logic [7:0]             s_axi_awlen;
+// logic [2:0]             s_axi_awsize;
+// logic [1:0]             s_axi_awburst;
+// logic                   s_axi_awlock;
+// logic [3:0]             s_axi_awcache;
+// logic [2:0]             s_axi_awprot;
+logic [DATA_WIDTH-1:0]  s_axi_wdata;
+logic [STRB_WIDTH-1:0]  s_axi_wstrb;
+logic                   s_axi_wlast;
+logic                   s_axi_wvalid;
+logic                   s_axi_wready;
 
-wire [ID_WIDTH-1:0]    s_axi_bid;
-wire [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error can be sent
-wire                   s_axi_bvalid;
-wire                   s_axi_bready;
+logic [ID_WIDTH-1:0]    s_axi_bid;
+logic [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error can be sent
+logic                   s_axi_bvalid;
+logic                   s_axi_bready;
 
 //todo Assign constant values:
-// wire [2:0]             s_axi_arsize;
-// wire [1:0]             s_axi_arburst;
-// wire                   s_axi_arlock;
-// wire [3:0]             s_axi_arcache;
-// wire [2:0]             s_axi_arprot;
+// logic [2:0]             s_axi_arsize;
+// logic [1:0]             s_axi_arburst;
+// logic                   s_axi_arlock;
+// logic [3:0]             s_axi_arcache;
+// logic [2:0]             s_axi_arprot;
 
-wire [1:0]             s_axi_rresp;
+logic [1:0]             s_axi_rresp;
 
 prefetcherTop #(
 .ADDR_BITS(ADDR_WIDTH),
@@ -253,7 +253,7 @@ axi_ram #
 
 assign rst = ~resetN;
 
-// commented wires - assign on tests
+// commented logics - assign on tests
 
 assign s_axi_awaddr = s_aw_addr;
 // assign s_axi_awlen = ;
