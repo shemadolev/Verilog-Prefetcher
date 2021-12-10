@@ -73,6 +73,14 @@ for (i = 0; i < 2**VALID_ADDR_WIDTH; i = i + 2**(VALID_ADDR_WIDTH/2)) begin \
     end \
 end 
 
+`define TRANSACTION(valid,ready) \
+    valid = 1'b1; \
+    #clock_period; \
+    while(~(valid & ready)) begin \
+        #clock_period; \
+    end \
+    valid = 1'b0;
+
 module prefetcherTop_memStub_tb();
 
 localparam ADDR_SIZE_ENCODE = 1; //4 addresses 
@@ -302,18 +310,11 @@ initial begin
     resetN=1;
 
     //Write req to BASE_ADDR
-    s_aw_valid = 1'b1;
     s_aw_addr = BASE_ADDR;
     s_aw_id = 5;
     s_axi_awlen = 8'd0; //BURST=1
 
-    #clock_period;
-
-    while(~(s_aw_valid & s_aw_ready)) begin
-        #clock_period;
-    end
-
-    s_aw_valid = 1'b0;
+    `TRANSACTION(s_aw_valid,s_aw_ready)
 
     for(int i=0;i<10;i++) begin
         #clock_period;
