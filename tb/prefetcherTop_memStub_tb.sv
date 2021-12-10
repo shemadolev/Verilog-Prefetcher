@@ -313,8 +313,6 @@ initial begin
         #clock_period;
     end
 
-    #clock_period;
-
     s_aw_valid = 1'b0;
 
     for(int i=0;i<10;i++) begin
