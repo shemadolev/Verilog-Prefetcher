@@ -75,7 +75,7 @@ $display("------- END Control --------")
 
 `define TRANSACTION(valid,ready) \
     valid = 1'b1; \
-    #1;
+    #1; \
     while(~(valid & ready)) begin \
         #(clock_period-1); \
     end \
