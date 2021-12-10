@@ -66,12 +66,12 @@ if(MOD.prefetchAddr_valid) \
     $display("  prefetchAddr_reg 0x%h",MOD.prefetchAddr_reg); \
 $display("------- END Control --------")
 
-`define printMem(MOD) \
-for (i = 0; i < 2**VALID_ADDR_WIDTH; i = i + 2**(VALID_ADDR_WIDTH/2)) begin \
-    for (j = i; j < i + 2**(VALID_ADDR_WIDTH/2); j = j + 1) begin \
-        $display("0x%h : 0x%h",j,MOD.mem[j]); \
-    end \
-end 
+// `define printMem(MOD) \
+// for (i = 0; i < 2**VALID_ADDR_WIDTH; i = i + 2**(VALID_ADDR_WIDTH/2)) begin \
+//     for (j = i; j < i + 2**(VALID_ADDR_WIDTH/2); j = j + 1) begin \
+//         $display("0x%h : 0x%h",j,MOD.mem[j]); \
+//     end \
+// end 
 
 `define TRANSACTION(valid,ready) \
     valid = 1'b1; \
@@ -83,7 +83,7 @@ end
 
 module prefetcherTop_memStub_tb();
 
-localparam ADDR_SIZE_ENCODE = 1; //4 addresses 
+localparam ADDR_SIZE_ENCODE = 5;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
 localparam QUEUE_WIDTH = 3'd3; 
 localparam WATCHDOG_SIZE = 10'd10; 
@@ -95,7 +95,7 @@ localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd3; 
 localparam PIPELINE_OUTPUT = 0;
 
-localparam VALID_ADDR_WIDTH = ADDR_WIDTH - $clog2(STRB_WIDTH);
+// localparam VALID_ADDR_WIDTH = ADDR_WIDTH - $clog2(STRB_WIDTH);
 //########### prefetcherTop ###########//
     // + axi signals (prefetcher<->DDR)
 logic                       clk;
@@ -288,13 +288,13 @@ initial begin
 end
 
 initial begin
-    localparam BASE_ADDR = 64'hdeadbeef;
+    localparam BASE_ADDR = 32'hbeef;
     resetN=0;
     en = 1;
 //CR Space
         // Ctrl
     watchdogCnt = 10'd1000;
-    bar = 0;
+    bar = 32'd0;
     limit = BASE_ADDR * 2;
     windowSize= 3;
         // Data
