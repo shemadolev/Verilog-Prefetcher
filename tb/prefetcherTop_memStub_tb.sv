@@ -75,10 +75,11 @@ $display("------- END Control --------")
 
 `define TRANSACTION(valid,ready) \
     valid = 1'b1; \
+    #1;
     while(~(valid & ready)) begin \
-        #clock_period; \
+        #(clock_period-1); \
     end \
-    #clock_period; \
+    #(clock_period-1); \
     valid = 1'b0;
 
 module prefetcherTop_memStub_tb();
