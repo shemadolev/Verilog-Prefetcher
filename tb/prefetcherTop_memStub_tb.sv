@@ -289,30 +289,30 @@ end
 
 initial begin
     localparam BASE_ADDR = 32'hbeef;
-    resetN=0;
-    en = 1;
+    resetN = 1'b0;
+    en = 1'b1;
 //CR Space
         // Ctrl
     watchdogCnt = 10'd1000;
     bar = 32'd0;
     limit = BASE_ADDR * 2;
-    windowSize= 3;
+    windowSize = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
         // Data
-    crs_almostFullSpacer=2;
+    crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
 
     s_aw_valid = 1'b0;
     s_axi_wvalid = 1'b0;
     s_ar_valid = 1'b0;
-    s_r_ready  = 1'b0;
+    s_r_ready = 1'b0;
 
     #clock_period;
 
-    resetN=1;
+    resetN=1'b1;
 
     //Write req to BASE_ADDR
     s_aw_addr = BASE_ADDR;
-    s_aw_id = 5;
-    s_axi_awlen = 8'd0; //BURST=1
+    s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
+    s_axi_awlen = {BURST_LEN_WIDTH{1'b0}}; //BURST=1
 
     `TRANSACTION(s_aw_valid,s_aw_ready)
 
@@ -326,8 +326,8 @@ initial begin
 
     //Read req of BASE_ADDR
     s_ar_addr = BASE_ADDR;
-    s_ar_len=1'b0;
-    s_ar_id=5;
+    s_ar_len = {BURST_LEN_WIDTH{1'b0}}; //BURST=1
+    s_ar_id={{(ID_WIDTH-3){1'b0}}, 3'd5};
 
     `TRANSACTION(s_ar_valid,s_ar_ready)
     
