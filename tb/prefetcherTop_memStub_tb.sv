@@ -324,45 +324,45 @@ initial begin
 
     $finish;
 
-    //Write data
-    s_axi_wvalid = 1'b1;
-    s_axi_wdata = 8'd1;
-    s_axi_wlast = 1'b1;
-    while(~(posedge_clk & s_axi_wvalid & s_axi_wready)) begin
-        #5;
-    end
-    #5;
-    s_axi_wvalid = 1'b0;
-    //Write response (B) should be returned, but not caught
+    // //Write data
+    // s_axi_wvalid = 1'b1;
+    // s_axi_wdata = 8'd1;
+    // s_axi_wlast = 1'b1;
+    // while(~(posedge_clk & s_axi_wvalid & s_axi_wready)) begin
+    //     #5;
+    // end
+    // #5;
+    // s_axi_wvalid = 1'b0;
+    // //Write response (B) should be returned, but not caught
 
-    //Read req of BASE_ADDR
-    s_ar_valid = 1'b1;
-    s_ar_addr = BASE_ADDR;
-    s_ar_len=0;
-    s_ar_id=5;
+    // //Read req of BASE_ADDR
+    // s_ar_valid = 1'b1;
+    // s_ar_addr = BASE_ADDR;
+    // s_ar_len=0;
+    // s_ar_id=5;
+
+    // // #5;
+    // while(~(posedge_clk & s_ar_valid & s_ar_ready)) begin
+    //     #5;
+    // end
+    // #5;
+    
+    // s_ar_valid = 1'b0;
+    
+    // $display("\n~~~~~~~   1. After read req of addr 0x%h",s_ar_addr);
+    // `printTop(prefetcherTop_dut);
+    // `printCtrl(prefetcherTop_dut.prCtrlPath);
+    // `printData(prefetcherTop_dut.prDataPath);
+    
+    // while(~(posedge_clk & s_r_valid)) begin
+    //     #5;
+    // end
 
     // #5;
-    while(~(posedge_clk & s_ar_valid & s_ar_ready)) begin
-        #5;
-    end
-    #5;
-    
-    s_ar_valid = 1'b0;
-    
-    $display("\n~~~~~~~   1. After read req of addr 0x%h",s_ar_addr);
-    `printTop(prefetcherTop_dut);
-    `printCtrl(prefetcherTop_dut.prCtrlPath);
-    `printData(prefetcherTop_dut.prDataPath);
-    
-    while(~(posedge_clk & s_r_valid)) begin
-        #5;
-    end
-
-    #5;
-    $display("\n~~~~~~~   2. s_r_valid == 1");
-    `printTop(prefetcherTop_dut);
-    `printCtrl(prefetcherTop_dut.prCtrlPath);
-    `printData(prefetcherTop_dut.prDataPath);
+    // $display("\n~~~~~~~   2. s_r_valid == 1");
+    // `printTop(prefetcherTop_dut);
+    // `printCtrl(prefetcherTop_dut.prCtrlPath);
+    // `printData(prefetcherTop_dut.prDataPath);
     
     $stop;
 end
