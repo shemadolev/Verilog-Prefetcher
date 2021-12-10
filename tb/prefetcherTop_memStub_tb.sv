@@ -271,7 +271,6 @@ initial begin
     clk <= '0;
     forever begin
         #(clock_period/2) clk = ~clk;
-        end
     end
 end
 
