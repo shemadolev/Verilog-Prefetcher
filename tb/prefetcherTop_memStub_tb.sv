@@ -75,10 +75,10 @@ end
 
 `define TRANSACTION(valid,ready) \
     valid = 1'b1; \
-    #clock_period; \
     while(~(valid & ready)) begin \
         #clock_period; \
     end \
+    #clock_period; \
     valid = 1'b0;
 
 module prefetcherTop_memStub_tb();
