@@ -75,16 +75,15 @@ $display("------- END Control --------")
 
 `define TRANSACTION(valid,ready) \
     valid = 1'b1; \
-    #1; \
     while(~(valid & ready)) begin \
-        #(clock_period-1); \
+        #clock_period; \
     end \
-    #(clock_period-1); \
+    #clock_period; \
     valid = 1'b0;
 
 module prefetcherTop_memStub_tb();
 
-localparam ADDR_SIZE_ENCODE = 5;
+localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
 localparam QUEUE_WIDTH = 3'd3; 
 localparam WATCHDOG_SIZE = 10'd10; 
@@ -292,7 +291,6 @@ initial begin
     localparam BASE_ADDR = 32'hbeef;
     resetN = 1'b0;
     en = 1'b1;
-    #(clock_period/2); //skew correction
 
     $display("axi_ram_inst.VALID_ADDR_WIDTH=%d",axi_ram_inst.VALID_ADDR_WIDTH);
     $display("axi_ram_inst.STRB_WIDTH=%d",axi_ram_inst.STRB_WIDTH);
