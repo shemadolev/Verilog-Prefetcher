@@ -294,7 +294,6 @@ initial begin
 
     s_aw_valid = 1'b0;
     s_axi_wvalid = 1'b0;
-    s_axi_bready = 1'b0;
     s_ar_valid = 1'b0;
     s_r_ready  = 1'b0;
 
