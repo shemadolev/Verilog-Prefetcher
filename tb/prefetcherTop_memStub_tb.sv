@@ -73,7 +73,7 @@ for (i = 0; i < 2**VALID_ADDR_WIDTH; i = i + 2**(VALID_ADDR_WIDTH/2)) begin \
     end \
 end 
 
-module prefetcherTop__memStub_tb();
+module prefetcherTop_memStub_tb();
 
 localparam ADDR_SIZE_ENCODE = 1; //4 addresses 
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
@@ -267,14 +267,10 @@ assign s_axi_bready = 1'b1;
 
 
 localparam clock_period=20;
-logic posedge_clk, clk_prev;
-assign posedge_clk = clk & ~clk_prev;
 initial begin
     clk <= '0;
     forever begin
-        #(clock_period/2) begin
-            clk_prev = clk;
-            clk = ~clk;
+        #(clock_period/2) clk = ~clk;
         end
     end
 end
@@ -288,34 +284,46 @@ initial begin
     localparam BASE_ADDR = 64'hdeadbeef;
     resetN=0;
     en = 1;
-    // watchdogCnt = 10'd1000;
-
-    #5;
-    resetN=1;
 //CR Space
         // Ctrl
+    watchdogCnt = 10'd1000;
     bar = 0;
     limit = BASE_ADDR * 2;
     windowSize= 3;
-    watchdogCnt= 10'd1000;
         // Data
     crs_almostFullSpacer=2;
 
-    s_aw_valid = 0;
-    s_ar_valid = 0;
-    s_r_ready  = 0;
-    s_axi_wvalid = 0;
+    s_aw_valid = 1'b0;
+    s_axi_wvalid = 1'b0;
+    s_axi_bready = 1'b0;
+    s_ar_valid = 1'b0;
+    s_r_ready  = 1'b0;
+
+    #clock_period;
+
+    resetN=1;
 
     //Write req to BASE_ADDR
     s_aw_valid = 1'b1;
     s_aw_addr = BASE_ADDR;
     s_aw_id = 5;
-    s_axi_awlen = 8'd0;
-    while(~(posedge_clk & s_aw_valid & s_aw_ready)) begin
-        #5;
+    s_axi_awlen = 8'd0; //BURST=1
+
+    #clock_period;
+
+    while(~(s_aw_valid & s_aw_ready)) begin
+        #clock_period;
     end
-    #5;
+
+    #clock_period;
+
     s_aw_valid = 1'b0;
+
+    for(int i=0;i<10;i++) begin
+        #clock_period;
+    end
+
+    $finish;
 
     //Write data
     s_axi_wvalid = 1'b1;
