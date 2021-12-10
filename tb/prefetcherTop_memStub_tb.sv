@@ -291,6 +291,7 @@ initial begin
     localparam BASE_ADDR = 32'hbeef;
     resetN = 1'b0;
     en = 1'b1;
+    #(clock_period/2); //skew correction
 
     $display("axi_ram_inst.VALID_ADDR_WIDTH=%d",axi_ram_inst.VALID_ADDR_WIDTH);
     $display("axi_ram_inst.STRB_WIDTH=%d",axi_ram_inst.STRB_WIDTH);
