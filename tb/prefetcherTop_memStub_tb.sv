@@ -317,7 +317,7 @@ initial begin
     `TRANSACTION(s_aw_valid,s_aw_ready)
 
     //Write data
-    s_axi_wdata = 8'd1;
+    s_axi_wdata = {DATA_WIDTH{1'b1}};
     s_axi_wlast = 1'b1;
 
     `TRANSACTION(s_axi_wvalid,s_axi_wready)
