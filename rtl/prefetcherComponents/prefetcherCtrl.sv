@@ -246,9 +246,10 @@ always_comb begin
                     m_ar_id_next = s_ar_id;
                     m_ar_addr_next = s_ar_addr;
                     
-                    if(pr_addrHit) //TODO check on which clk addrHit raises
+                    if(pr_addrHit) begin//TODO check on which clk addrHit raises
                         m_ar_valid_next = 1'b0;
                         st_exec_next = ST_EXEC_IDLE;
+                    end
                     else begin
                         m_ar_valid_next = 1'b1;
                         st_exec_next = ST_EXEC_M_AR_POLLING;
