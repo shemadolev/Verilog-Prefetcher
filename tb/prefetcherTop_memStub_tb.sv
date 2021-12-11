@@ -280,14 +280,15 @@ initial begin
     end
 end
 
-localparam timeout=1000;
+localparam timeout=100000;
 initial begin
     #(timeout) $finish;
 end
 
 initial begin
     localparam BASE_ADDR = 16'h0eef;
-    localparam REQ_NUM = 1;
+    localparam REQ_NUM = 4;
+    localparam LEN = 0;
     resetN = 1'b0;
     en = 1'b1;
 
@@ -316,7 +317,7 @@ initial begin
         //Write req to BASE_ADDR+i
         s_aw_addr = BASE_ADDR + i; // +i increment
         s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
-        s_axi_awlen = {{(BURST_LEN_WIDTH-2){1'b0}},{2'b10}}; //BURST=3
+        s_axi_awlen = LEN+2; 
 
         `TRANSACTION(s_aw_valid,s_aw_ready)
 
@@ -339,18 +340,22 @@ initial begin
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
         s_ar_addr = BASE_ADDR + i;
-        s_ar_len = {{(BURST_LEN_WIDTH-2){1'b0}},{2'b10}}; //BURST=3
+        s_ar_len = LEN;
         s_ar_id={{(ID_WIDTH-3){1'b0}}, 3'd5};
 
         `TRANSACTION(s_ar_valid,s_ar_ready)
+
+        #(clock_period*6);
     end
     
     s_r_ready = 1'b1;
 
+    #(clock_period*10);
+
     //Write req to move the prefetcher to st_cleanup
     s_aw_addr = BASE_ADDR;
     s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
-    s_axi_awlen = 0; //BURST=1
+    s_axi_awlen = LEN; //BURST=1
  
     `TRANSACTION(s_aw_valid,s_aw_ready)
 
