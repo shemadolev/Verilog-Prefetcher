@@ -256,7 +256,6 @@ always_comb begin
             end
             else if (pr_r_valid) begin
                 s_r_valid_next = 1'b1;
-                pr_opCode_next = 3'd4; //readDataPromise
                 st_exec_next = ST_EXEC_S_R_POLLING;
             end
             else if (m_r_valid) begin
@@ -300,8 +299,9 @@ always_comb begin
 
         ST_EXEC_S_R_POLLING: begin
             s_r_valid_next = 1'b1;
-            if(s_r_ready) begin
+            if(s_r_ready & s_r_valid) begin
                 s_r_valid_next = 1'b0;
+                pr_opCode_next = 3'd4; //readDataPromise
                 st_exec_next = ST_EXEC_IDLE;
             end
         end

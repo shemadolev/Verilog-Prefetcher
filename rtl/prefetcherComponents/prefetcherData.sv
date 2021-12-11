@@ -6,7 +6,8 @@
                     1 - readReqPref //todo
                     2 - readReqMaster(AXI AR/Read Request) //todo
                     3 - readDataSlave(AXI R/Read Data): Stores the reqData, reqLast from the previous cycle into the next block that expects data.
-                    4 - readDataPromise //todo
+                    4 - readDataPromise: Pops head if fulfilled all head promises, and nextHead is valid & his promise > 0,
+                                            mark that a read successfully fulfilled.
                 * errorCode:
                     0 - no error, 1 - Invalid opcode, 2 - ReadReq to full queue, 3 - Requesting data read when not ready, 4 - Read data overflow
  */
