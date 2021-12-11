@@ -343,30 +343,27 @@ initial begin
         s_ar_id={{(ID_WIDTH-3){1'b0}}, 3'd5};
 
         `TRANSACTION(s_ar_valid,s_ar_ready)
-
-        $display("\n~~~~~~~   1. After read req of addr 0x%h",s_ar_addr);
-        `printTop(prefetcherTop_dut);
-        `printCtrl(prefetcherTop_dut.prCtrlPath);
-        `printData(prefetcherTop_dut.prDataPath);
     end
     
     s_r_ready = 1'b1;
 
-    for(int i=0;i<10;i++) begin
-        #clock_period;
-    end
-    
-    
-    // while(~(posedge_clk & s_r_valid)) begin
-    //     #5;
-    // end
+    //Write req to move the prefetcher to st_cleanup
+    s_aw_addr = BASE_ADDR;
+    s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
+    s_axi_awlen = 0; //BURST=1
+ 
+    `TRANSACTION(s_aw_valid,s_aw_ready)
 
-    // #5;
-    // $display("\n~~~~~~~   2. s_r_valid == 1");
-    // `printTop(prefetcherTop_dut);
-    // `printCtrl(prefetcherTop_dut.prCtrlPath);
-    // `printData(prefetcherTop_dut.prDataPath);
-    
+    //Write data
+    s_axi_wdata = 0;
+    s_axi_wlast = 1'b0;
+	
+    `TRANSACTION(s_axi_wvalid,s_axi_wready)
+      
+    while(prefetcherTop_dut.pr_r_valid) begin
+        #clock_period;
+    end 
+      
     $stop;
 end
 
