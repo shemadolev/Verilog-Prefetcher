@@ -5,7 +5,7 @@
                     0 - NOP
                     1 - readReqPref //todo
                     2 - readReqMaster(AXI AR/Read Request) //todo
-                    3 - readDataSlave(AXI R/Read Data): Stores the reqData, reqLast from the previous cycle into the next block that expects data.
+                    3 - readDataSlave(AXI R/Read Data): Stores reqData & reqLast into the next block that expects data.
                     4 - readDataPromise: Pops head if fulfilled all head promises, and nextHead is valid & his promise > 0,
                                             mark that a read successfully fulfilled.
                 * errorCode:
@@ -59,8 +59,6 @@ logic [0:LOG_QUEUE_SIZE-1] readDataPtr; //Points to next block that readDataSlav
 logic [0:LOG_QUEUE_SIZE] validCnt;
 logic isEmpty, isFull, dataReady_curBurst, dataReady_nxtBurst, active;
 logic [0:LOG_QUEUE_SIZE-1] burstOffset; //For readDataPromise: Offset inside a burst
-logic [0:BLOCK_DATA_SIZE_BITS-1] reqData_prev;
-logic reqLast_prev;
 
 //find the valid address index
 findValueIdx #(.LOG_VEC_SIZE(LOG_QUEUE_SIZE), .TAG_SIZE(ADDR_BITS)) findAddrIdx 
@@ -91,7 +89,7 @@ vectorMask #(.LOG_WIDTH(LOG_QUEUE_SIZE)) tailBurst_mask
                 (.headIdx(tailPtr), .tailIdx(tailPtr + burst_len),
                  .outMask(tailBurstMask)
                 );
-
+                
 assign burst_len = reqBurstLen + 1;
 assign active = |validVec; //at least one block is valid
 assign respData = dataReady_curBurst ? dataMat[headPtr + burstOffset] : dataMat[headPtr + burst_len + burstOffset]; //Pass data in head/head+1, based on promise&dataValid of head
@@ -119,9 +117,6 @@ begin
         burstOffset <= {LOG_QUEUE_SIZE{1'b0}};
     end else begin
         errorCode <= 3'd0;
-
-        reqData_prev <= reqData;
-        reqLast_prev <= reqLast;
 
         case (reqOpcode)
             3'd0: ;//NOP - Do nothing
@@ -169,8 +164,8 @@ begin
             3'd3: begin
                 if(validVec[readDataPtr] != 1'b0) begin
                     dataValidVec[readDataPtr] <= 1'b1;
-                    dataMat[readDataPtr] <= reqData_prev;
-                    lastVec[readDataPtr] <= reqLast_prev;
+                    dataMat[readDataPtr] <= reqData;
+                    lastVec[readDataPtr] <= reqLast;
                     readDataPtr <= readDataPtr + 1'b1;
                 end else begin
                     errorCode <= 3'd4; //Read data overflow
