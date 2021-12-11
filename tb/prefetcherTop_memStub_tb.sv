@@ -314,7 +314,7 @@ initial begin
 
     resetN=1'b1;
 
-    for (i=0; i<REQ_NUM; i++) begin
+    for (int i=0; i<REQ_NUM; i++) begin
         //Write req to BASE_ADDR+i
         s_aw_addr = BASE_ADDR + i; // +i increment
         s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
@@ -332,7 +332,7 @@ initial begin
         // #clock_period;
     end
 
-    for (i=0; i<REQ_NUM; i++) begin
+    for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
         s_ar_addr = BASE_ADDR + i;
         s_ar_len = {BURST_LEN_WIDTH{1'b0}}; //BURST=1
