@@ -289,10 +289,11 @@ always_comb begin
         end
 
         ST_EXEC_M_R: begin
-            if(m_r_ready & m_r_valid)
+            if(m_r_ready & m_r_valid) begin 
                 pr_opCode = 3'd3; //readDataSlave
                 m_r_ready_next = 1'b1;
                 st_exec_next = ST_EXEC_M_R;
+            end
             else begin
                 st_exec_next = ST_EXEC_IDLE;
                 m_r_ready_next = 1'b0;
