@@ -286,8 +286,8 @@ initial begin
 end
 
 initial begin
-    localparam BASE_ADDR = 16'heef;
-    localparam REQ_NUM = 8;
+    localparam BASE_ADDR = 16'h0eef;
+    localparam REQ_NUM = 1;
     resetN = 1'b0;
     en = 1'b1;
 
@@ -297,7 +297,7 @@ initial begin
 //CR Space
         // Ctrl
     watchdogCnt = 10'd1000;
-    bar = 32'd0;
+    bar = 0;
     limit = BASE_ADDR * 2;
     windowSize = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
         // Data
@@ -316,15 +316,21 @@ initial begin
         //Write req to BASE_ADDR+i
         s_aw_addr = BASE_ADDR + i; // +i increment
         s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
-        s_axi_awlen = {BURST_LEN_WIDTH{1'b0}}; //BURST=1
+        s_axi_awlen = {{(BURST_LEN_WIDTH-2){1'b0}},{2'b10}}; //BURST=3
 
         `TRANSACTION(s_aw_valid,s_aw_ready)
 
         //Write data
-        s_axi_wdata = {DATA_WIDTH{1'b1}};
-        s_axi_wlast = 1'b1;
+	s_axi_wlast = 1'b0;
+	
+	for(int j=0;j<s_axi_awlen;j++) begin
+	    s_axi_wdata = i * (s_axi_awlen+1) + j;
+            `TRANSACTION(s_axi_wvalid,s_axi_wready)
+	end
 
-        `TRANSACTION(s_axi_wvalid,s_axi_wready)
+	s_axi_wdata = i * (s_axi_awlen+1) + s_axi_awlen;
+	s_axi_wlast = 1'b1;
+	`TRANSACTION(s_axi_wvalid,s_axi_wready)
 
         //Write response (B) should be returned, but not caught
         // #clock_period;
@@ -333,7 +339,7 @@ initial begin
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
         s_ar_addr = BASE_ADDR + i;
-        s_ar_len = {BURST_LEN_WIDTH{1'b0}}; //BURST=1
+        s_ar_len = {{(BURST_LEN_WIDTH-2){1'b0}},{2'b10}}; //BURST=3
         s_ar_id={{(ID_WIDTH-3){1'b0}}, 3'd5};
 
         `TRANSACTION(s_ar_valid,s_ar_ready)
@@ -344,6 +350,8 @@ initial begin
         `printData(prefetcherTop_dut.prDataPath);
     end
     
+    s_r_ready = 1'b1;
+
     for(int i=0;i<10;i++) begin
         #clock_period;
     end
