@@ -264,7 +264,8 @@ always_comb begin
                 s_r_valid_next = 1'b1;
             end
             else if (m_r_valid & (m_r_id == pr_m_ar_id)) begin
-                    m_r_ready_next = 1'b1;
+                m_r_ready_next = 1'b1;
+                st_exec_next = ST_EXEC_M_R;
             end
             else if (prefetchAddr_valid & ~shouldCleanup & ~pr_almostFull) begin
                 pr_opCode = 3'd1; //readReqPref
