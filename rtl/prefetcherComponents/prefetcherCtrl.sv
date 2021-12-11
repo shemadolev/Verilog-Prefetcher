@@ -110,7 +110,6 @@ always_ff @(posedge clk or negedge resetN) begin
         s_ar_addr_prev <= {ADDR_BITS{1'b0}};
         pr_flush <= 1'b1;
         ToBit <= 1'b0;
-        pr_opCode <= 3'd0;
         prefetchAddr_valid <= 1'b0;
         prefetchAddr_reg <= {ADDR_BITS{1'b0}};
         //AXI ready/valid signals
