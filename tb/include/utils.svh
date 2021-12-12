@@ -10,4 +10,10 @@
     #clock_period; \
     valid = 1'b0;
 
+`define tick(clk) \
+    clk=0; \
+    #1; \
+    clk=1; \
+    #1
+
 `endif

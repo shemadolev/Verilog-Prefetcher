@@ -1,33 +1,8 @@
 `resetall
 `timescale 1ns / 1ps
 
-`define tick(clk) \
-clk=0; \
-#1; \
-clk=1; \
-#1
-
-`define printContext(MOD) #1; \
-$display("------- BEGIN Prefetcher Context --------"); \
-$display("  st_pr_cur \t%s",MOD.st_pr_cur.name); \
-$display("  st_pr_next \t%s",MOD.st_pr_next.name); \
-$display("  st_exec_cur \t%s",MOD.st_exec_cur.name); \
-$display("  st_exec_next \t%s",MOD.st_exec_next.name); \
-$display("  pr_context_valid %b",MOD.pr_context_valid); \
-$display("  stride_sampled 0x%h",MOD.stride_sampled); \
-$display("  valid_burst %b",MOD.valid_burst); \
-if(MOD.stride_learned) \
-    $display("  stride_reg 0x%h",MOD.stride_reg); \
-    $display("  bar 0x%h, limit 0x%h",MOD.bar, MOD.limit); \
-if(pr_context_valid == 1) begin \
-    $display("  pr_m_ar_len %d",MOD.pr_m_ar_len); \
-    $display("  pr_m_ar_id %d",MOD.pr_m_ar_id); \
-end \
-$display("  prefetchAddr_valid %b",MOD.prefetchAddr_valid); \
-if(MOD.prefetchAddr_valid) \
-    $display("  prefetchAddr_reg 0x%h",MOD.prefetchAddr_reg); \
-$display("------- END Prefetcher Context --------")
-
+`include "print.svh"
+`include "utils.svh"
 
 module prefetcherCtrl_tb();
     localparam ADDR_BITS = 64; //64bit address 2^64
@@ -142,7 +117,7 @@ module prefetcherCtrl_tb();
         watchdogCnt = 10'd1000;
 
         `tick(clk);
-        `printContext(prefetcherCtrl_dut);
+        `printCtrl(prefetcherCtrl_dut);
         resetN=1;
         en=1;
         bar = 0;
@@ -167,21 +142,21 @@ module prefetcherCtrl_tb();
             $display("@@@@@@@   Master Read Req No.%d   @@@@@@@", i);
 
             $display("###### %d.1", i);
-            `printContext(prefetcherCtrl_dut);
+            `printCtrl(prefetcherCtrl_dut);
             assert(prefetcherCtrl_dut.shouldCleanup==1'b0);
             assert(s_ar_ready == 1);
             `tick(clk); //ST_EXEC_IDLE -> ST_EXEC_S_AR_PR_ACCESS
             s_ar_valid = 0;
 
             $display("###### %d.2", i);
-            `printContext(prefetcherCtrl_dut);
+            `printCtrl(prefetcherCtrl_dut);
             assert(prefetcherCtrl_dut.shouldCleanup==1'b0);
             assert(pr_opCode == 2); //read req to data path
             assert(s_ar_ready == 0);
             `tick(clk); //ST_EXEC_S_AR_PR_ACCESS -> ST_EXEC_S_AR_POLLING
 
             $display("###### %d.3", i);
-            `printContext(prefetcherCtrl_dut);
+            `printCtrl(prefetcherCtrl_dut);
             assert(prefetcherCtrl_dut.shouldCleanup==1'b0);
             assert(m_ar_valid == 1);
             `tick(clk); // ST_EXEC_S_AR_POLLING -> ST_EXEC_IDLE
@@ -189,7 +164,7 @@ module prefetcherCtrl_tb();
             assert(prefetcherCtrl_dut.shouldCleanup==1'b0);
 
             $display("###### %d.4", i);
-            `printContext(prefetcherCtrl_dut);
+            `printCtrl(prefetcherCtrl_dut);
         end
 
         m_ar_ready = 0;
@@ -205,7 +180,7 @@ module prefetcherCtrl_tb();
             `tick(clk);
             assert(m_r_ready == 1) else $error("i=%d m_r_ready=%d",i,prefetcherCtrl_dut.m_r_ready);
             assert(pr_opCode == 3) else $error("i=%d pr_opCode=%d",i,prefetcherCtrl_dut.pr_opCode); //readDataSlave, pr_opCode_next == NOP  
-            `printContext(prefetcherCtrl_dut);
+            `printCtrl(prefetcherCtrl_dut);
         end
         m_r_valid = 1'b0;
         
@@ -216,7 +191,7 @@ module prefetcherCtrl_tb();
         //Check that we start prefetching
         $display("\n~~~~~~~~~~~~~~~~~~~ Prefeth read req ~~~~~~~~~~~~~~~~~~~");
         for (int i=0; i<3; i++) begin
-            `printContext(prefetcherCtrl_dut);
+            `printCtrl(prefetcherCtrl_dut);
             m_ar_ready = 1;
             assert(pr_opCode == 0);
             assert(m_ar_valid == 1);
@@ -259,7 +234,7 @@ module prefetcherCtrl_tb();
             
             s_r_ready = 1;
             #1;
-            `printContext(prefetcherCtrl_dut);
+            `printCtrl(prefetcherCtrl_dut);
             `tick(clk);
             s_r_ready = 0;
             assert(s_r_valid == 0);
@@ -274,7 +249,7 @@ module prefetcherCtrl_tb();
         pr_r_valid = 0;
         #1;
         assert(prefetcherCtrl_dut.shouldCleanup == 1);
-        `printContext(prefetcherCtrl_dut);
+        `printCtrl(prefetcherCtrl_dut);
         $display("strideMiss=%b",prefetcherCtrl_dut.strideMiss);
         $display("stride_sampled=0x%h",prefetcherCtrl_dut.stride_sampled);
         $display("stride_reg=0x%h",prefetcherCtrl_dut.stride_reg);
@@ -284,7 +259,7 @@ module prefetcherCtrl_tb();
         `tick(clk); //ST_EXEC_IDLE > ST_EXEC_IDLE
         assert(pr_isCleanup == 1);
         assert(s_ar_ready == 0); //Make sure EXEC is not passing the AR
-        `printContext(prefetcherCtrl_dut);
+        `printCtrl(prefetcherCtrl_dut);
 
         for (int i=0; i<3; i++) begin
             for (int i=0; i<3; i++) begin
@@ -300,7 +275,7 @@ module prefetcherCtrl_tb();
         pr_hasOutstanding = 0;
         pr_r_valid = 0;
         `tick(clk);
-        `printContext(prefetcherCtrl_dut);
+        `printCtrl(prefetcherCtrl_dut);
         assert(pr_isCleanup == 0);
         assert(prefetcherCtrl_dut.st_pr_cur == 0); //ST_PR_IDLE
 

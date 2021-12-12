@@ -1,45 +1,8 @@
 `resetall
 `timescale 1ns / 1ps
 
-`define tick(clk) \
-clk=0; \
-#1; \
-clk=1; \
-#1
-
-`define printPrefetcher(MOD) \
-$display("------- BEGIN Prefetcher State --------"); \
-$display("  almostFull %b",MOD.almostFull); \
-$display("  errorCode %d",MOD.errorCode); \
-$display("  prefetchReqCnt %d",MOD.prefetchReqCnt); \
-$display("  head:%d tail:%d validCnt:%d isEmpty:%d isFull:%d",MOD.headPtr, MOD.tailPtr, MOD.validCnt, MOD.isEmpty, MOD.isFull); \
-$display("  hasOutstanding:%b burstOffset:%d readDataPtr:%d",MOD.hasOutstanding, MOD.burstOffset, MOD.readDataPtr); \
-$display(" ** Requset signal **"); \
-$display("   addrHit:%d addrIdx:%d", MOD.addrHit, MOD.addrIdx); \
-for(int i=0;i<MOD.QUEUE_SIZE;i++) begin \
-    $display("--Block           %d ",i); \
-    if(MOD.headPtr == i) \
-        $display(" ^^^ HEAD ^^^"); \
-    if(MOD.tailPtr == i) \
-        $display(" ^^^ TAIL ^^^"); \
-    $display("  valid           %d",MOD.validVec[i]); \
-    if(MOD.validVec[i]) begin \
-        $display("  addrValid       %b",MOD.addrValid[i]); \
-        if(MOD.addrValid[i]) begin \
-            $display("  address         0x%h",MOD.blockAddrMat[i]); \
-            $display("  prefetchReq     %b",MOD.prefetchReqVec[i]); \
-            $display("  promiseCnt      %d",MOD.promiseCnt[i]); \
-        end \
-        $display("  data valid      %d",MOD.dataValidVec[i]); \
-        if(MOD.dataValidVec[i]) begin \
-            $display("  data            0x%h",MOD.dataMat[i]); \
-            $display("  last            0x%h",MOD.lastVec[i]); \
-        end \
-    end \
-end \
-$display(" ** Resp data **"); \
-$display(" pr_r_valid:%b respData:0x%h respLast:%b", MOD.pr_r_valid, MOD.respData, MOD.respLast); \
-$display("------- END Prefetcher State --------")
+`include "print.svh"
+`include "utils.svh"
 
 module prefetcherDataTb ();
 
@@ -106,7 +69,7 @@ module prefetcherDataTb ();
         `tick(clk);
         $display("###### Reseted prefetcher");
         resetN=1;
-        `printPrefetcher(prefetcherData_dut);
+        `printData(prefetcherData_dut);
         reqBurstLen=0; //==1 
 
     //readReqMaster
@@ -120,7 +83,7 @@ module prefetcherDataTb ();
         end
 
         $display("###### After read_req_NVDLA burst");
-        `printPrefetcher(prefetcherData_dut);
+        `printData(prefetcherData_dut);
         assert(pr_r_valid == 1'b0); //verify that no data was inserted to the prefetcher
         assert(hasOutstanding == 1'b1);
 
@@ -137,7 +100,7 @@ module prefetcherDataTb ();
             reqLast=1'b1;
             `tick(clk);
             $display("###### After read_data_DDR (%d/5)", i+1);
-            `printPrefetcher(prefetcherData_dut);
+            `printData(prefetcherData_dut);
             assert(pr_r_valid == 1'b1); //verify that the data path inform the controller that there is data that can be sent to NVDLA
         end
         assert(hasOutstanding == 1'b0);
@@ -151,7 +114,7 @@ module prefetcherDataTb ();
             `tick(clk);
         end
         $display("###### After prefetching 2 addresses");
-        `printPrefetcher(prefetcherData_dut);
+        `printData(prefetcherData_dut);
         assert(hasOutstanding == 1'b1);
 
     //readDataPromise
@@ -159,7 +122,7 @@ module prefetcherDataTb ();
             reqOpcode=4; 
             `tick(clk);
             $display("###### After read_data_NVDLA");
-            `printPrefetcher(prefetcherData_dut);
+            `printData(prefetcherData_dut);
         end
     
     //readReqMaster - request the prefetched addresses
@@ -174,7 +137,7 @@ module prefetcherDataTb ();
             assert(addrHit == 1'b1);
         end
         $display("###### After requesting the prefetched addresses (twice for each)");
-        `printPrefetcher(prefetcherData_dut);
+        `printData(prefetcherData_dut);
         assert(prefetchReqCnt == 0); //no unrequested addresses at this point
         assert(pr_r_valid == 1'b0);
 
@@ -185,7 +148,7 @@ module prefetcherDataTb ();
         `tick(clk);
         $display("###### Reseted prefetcher");
         resetN=1;
-        `printPrefetcher(prefetcherData_dut);
+        `printData(prefetcherData_dut);
 
     $display("**** All tests passed ****");
     
