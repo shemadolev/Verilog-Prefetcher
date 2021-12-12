@@ -223,7 +223,7 @@ initial begin
 
     #clock_period;
     resetN=1'b1;
-    s_r_ready = 1'b0;
+    s_r_ready = 1'b1;
 
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
@@ -236,14 +236,23 @@ initial begin
         #(clock_period*20);
     end
 
+    s_r_ready = 1'b0;
+       s_ar_addr = BASE_ADDR + REQ_NUM * STRIDE;
+        s_ar_len = RD_LEN;
+        s_ar_id = TRANS_ID;
+
+        `TRANSACTION(s_ar_valid,s_ar_ready)
+
     s_ar_addr = BASE_ADDR; //Break stride
     s_ar_len = RD_LEN;
     s_ar_id = TRANS_ID;
-
-    `TRANSACTION(s_ar_valid,s_ar_ready)
+s_ar_valid = 1'b1;
+	
+	//Show stuck on cleanup
+	#(clock_period*20);
 
     //Enable reading data, cleanup should end (return to IDLE) once all promised data is returned
-    s_r_ready = 1'b0;
+    s_r_ready = 1'b1;
 
     #(clock_period*50);
       
