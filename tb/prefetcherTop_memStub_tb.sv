@@ -291,7 +291,7 @@ end
 
 initial begin
     localparam BASE_ADDR = 16'h0eef;
-    localparam REQ_NUM = 4;
+    localparam REQ_NUM = 3;
     localparam LEN = 0;
     resetN = 1'b0;
     en = 1'b1;
@@ -305,6 +305,7 @@ initial begin
     bar = 0;
     limit = BASE_ADDR * 2;
     windowSize = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
+    crs_prefetch_freq = 10;
         // Data
     crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
 
@@ -354,7 +355,7 @@ initial begin
     
     s_r_ready = 1'b1;
 
-    #(clock_period*10);
+    #(clock_period*100);
 
     //Write req to move the prefetcher to st_cleanup
     s_aw_addr = BASE_ADDR;
@@ -373,7 +374,7 @@ initial begin
         #clock_period;
     end 
       
-    $stop;
+    $finish;
 end
 
 endmodule
