@@ -191,7 +191,7 @@ initial begin
     end
 end
 
-localparam timeout=1000;
+localparam timeout=10000;
 initial begin
     #(timeout) $finish;
 end
@@ -244,7 +244,7 @@ initial begin
 
     //Write response (B) should be returned, but not caught
 
-    #(clock_period*20);
+    #(clock_period*12);
 
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
@@ -257,9 +257,7 @@ initial begin
         #(clock_period*6);
     end
     
-    s_r_ready = 1'b1;
-
-    #(clock_period*100);
+    #(clock_period*25);
       
     $finish;
 end
