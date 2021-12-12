@@ -101,9 +101,10 @@ clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
 // Prefetching freq.
 logic prefetch_freq_pulse;
 clkDivN #(.WIDTH(PRFETCH_FRQ_WIDTH)) prefetchFreqClkDiv
-            (.clk(clk), .resetN(resetN), .preScaleValue(crs_prefetch_freq),
-             .slowEnPulse(prefetch_freq_pulse)
-            // , .slowEnPulse_d(watchdogHit_d)
+            (.clk(clk),
+            .resetN(resetN & ~(m_ar_valid & m_ar_ready)), //Reset timer on every successful read req'
+            .preScaleValue(crs_prefetch_freq),
+            .slowEnPulse(prefetch_freq_pulse)
             );
 
 //FSM States
