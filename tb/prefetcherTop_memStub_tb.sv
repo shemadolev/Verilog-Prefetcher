@@ -92,6 +92,7 @@ localparam DATA_WIDTH = (1<<DATA_SIZE_ENCODE)<<3;
 localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd3; 
 localparam PIPELINE_OUTPUT = 0;
+localparam PRFETCH_FRQ_WIDTH = 3'd6;
 
 // localparam VALID_ADDR_WIDTH = ADDR_WIDTH - $clog2(STRB_WIDTH);
 //########### prefetcherTop ###########//
@@ -129,6 +130,7 @@ logic [0:ADDR_WIDTH-1]       bar;
 logic [0:ADDR_WIDTH-1]       limit;
 logic [0:QUEUE_WIDTH]       windowSize;
 logic [0:WATCHDOG_SIZE-1]   watchdogCnt; 
+logic [0:PRFETCH_FRQ_WIDTH-1] crs_prefetch_freq;
 logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
 
@@ -170,7 +172,8 @@ prefetcherTop #(
 .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
 .TID_WIDTH(ID_WIDTH),
 .LOG_BLOCK_DATA_BYTES(DATA_SIZE_ENCODE),
-.PROMISE_WIDTH(PROMISE_WIDTH)
+.PROMISE_WIDTH(PROMISE_WIDTH),
+.PRFETCH_FRQ_WIDTH(PRFETCH_FRQ_WIDTH)
 ) prefetcherTop_dut (
     .clk(clk),
     .en(en), 
@@ -206,6 +209,7 @@ prefetcherTop #(
     .windowSize(windowSize),
     .watchdogCnt(watchdogCnt), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
+    .crs_prefetch_freq(crs_prefetch_freq),
     .errorCode(errorCode)
 );
 

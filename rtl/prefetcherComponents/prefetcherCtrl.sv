@@ -7,6 +7,7 @@ module prefetcherCtrl #(
     parameter ADDR_BITS = 64, //64bit address 2^64
     parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
     parameter WATCHDOG_SIZE = 10'd10, // number of bits for the watchdog counter
+    parameter PRFETCH_FRQ_WIDTH = 3'd6,
     parameter BURST_LEN_WIDTH = 4'd8, //NVDLA max is 3, AXI4 supports up to 8 bits
     parameter TID_WIDTH = 4'd8 //NVDLA max is 3, AXI4 supports up to 8 bits
 )(
@@ -60,7 +61,8 @@ module prefetcherCtrl #(
     input logic     [0:ADDR_BITS-1] bar,
     input logic     [0:ADDR_BITS-1] limit,
     input logic     [0:LOG_QUEUE_SIZE] windowSize,
-    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt //the size of the counter that is used to divide the clk freq for the watchdog
+    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
+    input logic     [0:PRFETCH_FRQ_WIDTH-1] crs_prefetch_freq
 );
 
 // Slice's context
@@ -91,11 +93,17 @@ logic s_ar_ready_next;
 logic watchdogHit;
 logic watchdogHit_d;
 logic st_exec_changed;
-
-// Watchdog
 clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
             (.clk(clk), .resetN(resetN), .preScaleValue(watchdogCnt),
              .slowEnPulse(watchdogHit), .slowEnPulse_d(watchdogHit_d)
+            );
+
+// Prefetching freq.
+logic prefetch_freq_pulse;
+clkDivN #(.WIDTH(PRFETCH_FRQ_WIDTH)) prefetchFreqClkDiv
+            (.clk(clk), .resetN(resetN), .preScaleValue(crs_prefetch_freq),
+             .slowEnPulse(prefetch_freq_pulse)
+            // , .slowEnPulse_d(watchdogHit_d)
             );
 
 //FSM States
@@ -267,7 +275,7 @@ always_comb begin
                 m_r_ready_next = 1'b1;
                 st_exec_next = ST_EXEC_M_R;
             end
-            else if (prefetchAddr_valid & ~shouldCleanup & ~pr_almostFull) begin
+            else if (prefetch_freq_pulse & prefetchAddr_valid & ~shouldCleanup & ~pr_almostFull) begin
                 pr_opCode = 3'd1; //readReqPref
                 pr_m_ar_addr = prefetchAddr_reg;
                 

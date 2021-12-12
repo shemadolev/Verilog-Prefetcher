@@ -10,6 +10,7 @@ module prefetcherTop #(
     parameter ADDR_BITS = 64, //64bit address 2^64
     parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
     parameter WATCHDOG_SIZE = 10'd10, // number of bits for the watchdog counter
+    parameter PRFETCH_FRQ_WIDTH = 3'd6,
     parameter BURST_LEN_WIDTH = 4'd8, //NVDLA max is 3, AXI4 supports up to 8 bits
     parameter TID_WIDTH = 4'd8, //NVDLA max is 3, AXI4 supports up to 8 bits
     parameter LOG_BLOCK_DATA_BYTES = 3'd6, //[Bytes]
@@ -68,6 +69,7 @@ module prefetcherTop #(
     input logic     [0:ADDR_BITS-1] limit,
     input logic     [0:LOG_QUEUE_SIZE] windowSize,
     input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
+    input logic     [0:PRFETCH_FRQ_WIDTH-1] crs_prefetch_freq,
         // Data
     input logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer,
 
@@ -176,7 +178,8 @@ prefetcherCtrl #(
     .bar(bar), 
     .limit(limit), 
     .windowSize(windowSize), 
-    .watchdogCnt(watchdogCnt)
+    .watchdogCnt(watchdogCnt),
+    .crs_prefetch_freq(crs_prefetch_freq)
 );
 
 always_comb begin
