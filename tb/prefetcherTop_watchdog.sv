@@ -4,7 +4,7 @@
 `include "print.svh"
 `include "utils.svh"
 
-module prefetcherTop_memStub_tb();
+module prefetcherTop_watchdog();
 
 localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
@@ -19,7 +19,6 @@ localparam PROMISE_WIDTH = 3'd3;
 localparam PIPELINE_OUTPUT = 0;
 localparam PRFETCH_FRQ_WIDTH = 3'd6;
 
-// localparam VALID_ADDR_WIDTH = ADDR_WIDTH - $clog2(STRB_WIDTH);
 //########### prefetcherTop ###########//
     // + axi signals (prefetcher<->DDR)
 logic                       clk;
@@ -65,11 +64,6 @@ logic                   rst;
 //These are not checked, assign some contants for valid/ready
 logic [ADDR_WIDTH-1:0]  s_axi_awaddr;
 logic [7:0]             s_axi_awlen;
-// logic [2:0]             s_axi_awsize;
-// logic [1:0]             s_axi_awburst;
-// logic                   s_axi_awlock;
-// logic [3:0]             s_axi_awcache;
-// logic [2:0]             s_axi_awprot;
 logic [DATA_WIDTH-1:0]  s_axi_wdata;
 logic [STRB_WIDTH-1:0]  s_axi_wstrb;
 logic                   s_axi_wlast;
@@ -81,12 +75,6 @@ logic [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error ca
 logic                   s_axi_bvalid;
 logic                   s_axi_bready;
 
-//todo Assign constant values:
-// logic [2:0]             s_axi_arsize;
-// logic [1:0]             s_axi_arburst;
-// logic                   s_axi_arlock;
-// logic [3:0]             s_axi_arcache;
-// logic [2:0]             s_axi_arprot;
 
 logic [1:0]             s_axi_rresp;
 
@@ -190,14 +178,8 @@ axi_ram #
 
 assign rst = ~resetN;
 
-// commented logics - assign on tests
-
 assign s_axi_awaddr = s_aw_addr;
-// assign s_axi_awlen = ;
 assign s_axi_wstrb = {STRB_WIDTH{1'b1}};
-// assign s_axi_wdata = ;
-// assign s_axi_wlast = ;
-// assign s_axi_wvalid = ; 
 assign s_axi_bready = 1'b1;
 
 
@@ -209,18 +191,18 @@ initial begin
     end
 end
 
-localparam timeout=100000;
+localparam timeout=1000;
 initial begin
     #(timeout) $finish;
 end
 
 initial begin
     localparam BASE_ADDR = 16'h0eef;
-    localparam REQ_NUM = 3;
+    localparam REQ_NUM = 1;
     localparam RD_LEN = 0;
-    localparam STRIDE = 3;
+    localparam STRIDE = 0;
     localparam TRANS_ID = 5; 
-    localparam WR_LEN = 99;
+    localparam WR_LEN = 3;
     resetN = 1'b0;
     en = 1'b1;
 
@@ -229,7 +211,7 @@ initial begin
 
 //CR Space
         // Ctrl
-    watchdogCnt = 10'd1000;
+    watchdogCnt = 10'd10;
     bar = 0;
     limit = BASE_ADDR * 2;
     windowSize = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
@@ -265,6 +247,8 @@ initial begin
 
     //Write response (B) should be returned, but not caught
 
+    #(clock_period*20);
+
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
         s_ar_addr = BASE_ADDR + i * STRIDE;
@@ -279,23 +263,6 @@ initial begin
     s_r_ready = 1'b1;
 
     #(clock_period*100);
-
-    //Write req to move the prefetcher to st_cleanup
-    s_aw_addr = BASE_ADDR;
-    s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
-    s_axi_awlen = RD_LEN; //BURST=1
- 
-    `TRANSACTION(s_aw_valid,s_aw_ready)
-
-    //Write data
-    s_axi_wdata = 0;
-    s_axi_wlast = 1'b0;
-	
-    `TRANSACTION(s_axi_wvalid,s_axi_wready)
-      
-    while(prefetcherTop_dut.pr_r_valid) begin
-        #clock_period;
-    end 
       
     $finish;
 end
