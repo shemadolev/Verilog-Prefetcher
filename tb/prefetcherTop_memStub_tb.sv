@@ -292,7 +292,10 @@ end
 initial begin
     localparam BASE_ADDR = 16'h0eef;
     localparam REQ_NUM = 4;
-    localparam LEN = 0;
+    localparam RD_LEN = 0;
+    localparam STRIDE = 3;
+    localparam TRANS_ID = 5; 
+    localparam WR_LEN = 99;
     resetN = 1'b0;
     en = 1'b1;
 
@@ -314,38 +317,33 @@ initial begin
     s_r_ready = 1'b0;
 
     #clock_period;
-
     resetN=1'b1;
 
-    for (int i=0; i<REQ_NUM; i++) begin
-        //Write req to BASE_ADDR+i
-        s_aw_addr = BASE_ADDR + i; // +i increment
-        s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
-        s_axi_awlen = LEN+2; 
+    //AW of initial data (sequential of 0->(WR_LEN-1))
+    s_aw_addr = BASE_ADDR; // +i increment
+    s_aw_id = TRANS_ID;
+    s_axi_awlen = WR_LEN; 
 
-        `TRANSACTION(s_aw_valid,s_aw_ready)
+    `TRANSACTION(s_aw_valid,s_aw_ready)
 
-        //Write data
-	s_axi_wlast = 1'b0;
-	
-	for(int j=0;j<s_axi_awlen;j++) begin
-	    s_axi_wdata = i * (s_axi_awlen+1) + j;
-            `TRANSACTION(s_axi_wvalid,s_axi_wready)
+    //Write data
+    s_axi_wlast = 1'b0;
+	for(int i=0;i<s_axi_awlen;i++) begin
+	    s_axi_wdata = i;
+        `TRANSACTION(s_axi_wvalid,s_axi_wready)
 	end
 
-	s_axi_wdata = i * (s_axi_awlen+1) + s_axi_awlen;
+	s_axi_wdata = s_axi_awlen;
 	s_axi_wlast = 1'b1;
 	`TRANSACTION(s_axi_wvalid,s_axi_wready)
 
-        //Write response (B) should be returned, but not caught
-        // #clock_period;
-    end
+    //Write response (B) should be returned, but not caught
 
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
-        s_ar_addr = BASE_ADDR + i;
-        s_ar_len = LEN;
-        s_ar_id={{(ID_WIDTH-3){1'b0}}, 3'd5};
+        s_ar_addr = BASE_ADDR + i * STRIDE;
+        s_ar_len = RD_LEN;
+        s_ar_id = TRANS_ID;
 
         `TRANSACTION(s_ar_valid,s_ar_ready)
 
@@ -359,7 +357,7 @@ initial begin
     //Write req to move the prefetcher to st_cleanup
     s_aw_addr = BASE_ADDR;
     s_aw_id = {{(ID_WIDTH-3){1'b0}}, 3'd5};
-    s_axi_awlen = LEN; //BURST=1
+    s_axi_awlen = RD_LEN; //BURST=1
  
     `TRANSACTION(s_aw_valid,s_aw_ready)
 
