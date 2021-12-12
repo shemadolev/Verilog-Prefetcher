@@ -4,7 +4,7 @@
 `include "print.svh"
 `include "utils.svh"
 
-module prefetcherTop_watchdog();
+module prefetcherTop_stride_flush();
 
 localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
@@ -191,28 +191,28 @@ initial begin
     end
 end
 
-localparam timeout=1000;
+localparam timeout=100000;
 initial begin
     #(timeout) $finish;
 end
 
 initial begin
     localparam BASE_ADDR = 16'h0eef;
-    localparam REQ_NUM = 1;
+    localparam REQ_NUM = 4;
     localparam RD_LEN = 0;
-    localparam STRIDE = 0;
+    localparam STRIDE = 3;
     localparam TRANS_ID = 5; 
-    localparam WR_LEN = 3;
+    localparam WR_LEN = 99;
     resetN = 1'b0;
     en = 1'b1;
 
 //CR Space
         // Ctrl
-    watchdogCnt = 10'd10;
+    watchdogCnt = 10'd1000;
     bar = 0;
     limit = BASE_ADDR * 2;
     windowSize = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
-    crs_prefetch_freq = 10;
+    crs_prefetch_freq = 4;
         // Data
     crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
 
@@ -223,28 +223,7 @@ initial begin
 
     #clock_period;
     resetN=1'b1;
-
-    //AW of initial data (sequential of 0->(WR_LEN-1))
-    s_aw_addr = BASE_ADDR; // +i increment
-    s_aw_id = TRANS_ID;
-    s_axi_awlen = WR_LEN; 
-
-    `TRANSACTION(s_aw_valid,s_aw_ready)
-
-    //Write data
-    s_axi_wlast = 1'b0;
-	for(int i=0;i<s_axi_awlen;i++) begin
-	    s_axi_wdata = i;
-        `TRANSACTION(s_axi_wvalid,s_axi_wready)
-	end
-
-	s_axi_wdata = s_axi_awlen;
-	s_axi_wlast = 1'b1;
-	`TRANSACTION(s_axi_wvalid,s_axi_wready)
-
-    //Write response (B) should be returned, but not caught
-
-    #(clock_period*20);
+    s_r_ready = 1'b0;
 
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
@@ -254,12 +233,19 @@ initial begin
 
         `TRANSACTION(s_ar_valid,s_ar_ready)
 
-        #(clock_period*6);
+        #(clock_period*20);
     end
-    
-    s_r_ready = 1'b1;
 
-    #(clock_period*100);
+    s_ar_addr = BASE_ADDR; //Break stride
+    s_ar_len = RD_LEN;
+    s_ar_id = TRANS_ID;
+
+    `TRANSACTION(s_ar_valid,s_ar_ready)
+
+    //Enable reading data, cleanup should end (return to IDLE) once all promised data is returned
+    s_r_ready = 1'b0;
+
+    #(clock_period*50);
       
     $finish;
 end

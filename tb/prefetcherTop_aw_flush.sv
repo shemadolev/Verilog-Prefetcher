@@ -206,9 +206,6 @@ initial begin
     resetN = 1'b0;
     en = 1'b1;
 
-    $display("axi_ram_inst.VALID_ADDR_WIDTH=%d",axi_ram_inst.VALID_ADDR_WIDTH);
-    $display("axi_ram_inst.STRB_WIDTH=%d",axi_ram_inst.STRB_WIDTH);
-
 //CR Space
         // Ctrl
     watchdogCnt = 10'd1000;
