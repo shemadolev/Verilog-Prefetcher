@@ -219,7 +219,7 @@ initial begin
     s_aw_valid = 1'b0;
     s_axi_wvalid = 1'b0;
     s_ar_valid = 1'b0;
-    s_r_ready = 1'b0;
+    s_r_ready = 1'b1;
 
     #clock_period;
     resetN=1'b1;
@@ -254,8 +254,6 @@ initial begin
 
         #(clock_period*6);
     end
-    
-    s_r_ready = 1'b1;
 
     #(clock_period*100);
 
@@ -269,12 +267,9 @@ initial begin
     //Write data
     s_axi_wdata = 0;
     s_axi_wlast = 1'b0;
-	
-    `TRANSACTION(s_axi_wvalid,s_axi_wready)
-      
-    while(prefetcherTop_dut.pr_r_valid) begin
-        #clock_period;
-    end 
+    s_axi_wvalid = 1'b1;
+    
+    #(clock_period*5);
       
     $finish;
 end

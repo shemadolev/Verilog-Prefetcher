@@ -74,7 +74,7 @@ logic [ID_WIDTH-1:0]    s_axi_bid;
 logic [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error can be sent
 logic                   s_axi_bvalid;
 logic                   s_axi_bready;
-
+logic			ddr_m_r_valid;
 
 logic [1:0]             s_axi_rresp;
 
@@ -172,7 +172,7 @@ axi_ram #
     .s_axi_rdata(m_r_data),
     .s_axi_rresp(s_axi_rresp),
     .s_axi_rlast(m_r_last),
-    .s_axi_rvalid(m_r_valid),
+    .s_axi_rvalid(ddr_m_r_valid),
     .s_axi_rready(m_r_ready)
 );
 
@@ -196,6 +196,10 @@ initial begin
     #(timeout) $finish;
 end
 
+logic choose_ddr_r = 1'b1;
+
+assign m_r_valid = choose_ddr_r ? ddr_m_r_valid : 1'b0;
+
 initial begin
     localparam BASE_ADDR = 16'h0eef;
     localparam REQ_NUM = 4;
@@ -206,6 +210,7 @@ initial begin
     resetN = 1'b0;
     en = 1'b1;
 
+    choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
 //CR Space
         // Ctrl
     watchdogCnt = 10'd1000;
@@ -219,14 +224,16 @@ initial begin
     s_aw_valid = 1'b0;
     s_axi_wvalid = 1'b0;
     s_ar_valid = 1'b0;
-    s_r_ready = 1'b0;
+    s_r_ready = 1'b1;
 
     #clock_period;
     resetN=1'b1;
-    s_r_ready = 1'b0;
 
     for (int i=0; i<REQ_NUM; i++) begin
         //Read req of BASE_ADDR
+	if(i == REQ_NUM-1)
+	    choose_ddr_r = 1'b0; //Block DDR's r_valid
+
         s_ar_addr = BASE_ADDR + i * STRIDE;
         s_ar_len = RD_LEN;
         s_ar_id = TRANS_ID;
@@ -239,14 +246,16 @@ initial begin
     s_ar_addr = BASE_ADDR; //Break stride
     s_ar_len = RD_LEN;
     s_ar_id = TRANS_ID;
-
-    `TRANSACTION(s_ar_valid,s_ar_ready)
+    s_ar_valid = 1'b1;
 
     //Enable reading data, cleanup should end (return to IDLE) once all promised data is returned
-    s_r_ready = 1'b0;
 
-    #(clock_period*50);
-      
+    #(clock_period*30); //Show stuck on cleanup (has outstanding AR)
+
+    choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
+    
+    #(clock_period*30);
+	
     $finish;
 end
 
