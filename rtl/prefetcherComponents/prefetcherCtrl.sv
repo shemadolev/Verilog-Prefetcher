@@ -109,7 +109,7 @@ clkDivN #(.WIDTH(PRFETCH_FRQ_WIDTH)) prefetchFreqClkDiv
 
 //FSM States
 enum logic [1:0] {ST_PR_IDLE, ST_PR_ARM, ST_PR_ACTIVE, ST_PR_CLEANUP} st_pr_cur, st_pr_next;
-enum logic [1:0] {ST_EXEC_IDLE, ST_EXEC_M_AR_POLLING, ST_EXEC_M_R} st_exec_cur, st_exec_next;
+enum logic [1:0] {ST_EXEC_IDLE, ST_EXEC_M_AR_POLLING, ST_EXEC_M_R, ST_EXEC_S_R_POLLING} st_exec_cur, st_exec_next;
 
 always_ff @(posedge clk or negedge resetN) begin
 	if(!resetN || (watchdogHit && !watchdogHit_d && ToBit==1'b1)) begin
@@ -266,11 +266,8 @@ always_comb begin
                     s_ar_ready_next = 1'b1;
             end
             else if (pr_r_valid) begin
-                if(s_r_valid & s_r_ready)begin
-                    s_r_valid_next = 1'b0;
-                    pr_opCode = 3'd4; //readDataPromise
-                end
                 s_r_valid_next = 1'b1;
+                st_exec_next = ST_EXEC_S_R_POLLING;
             end
             else if (m_r_valid & (m_r_id == pr_m_ar_id)) begin
                 m_r_ready_next = 1'b1;
@@ -290,6 +287,15 @@ always_comb begin
             end
         end
       
+        ST_EXEC_S_R_POLLING: begin
+            if(s_r_valid & s_r_ready)begin
+                s_r_valid_next = 1'b0;
+                pr_opCode = 3'd4; //readDataPromise
+                st_exec_next = ST_EXEC_IDLE;
+            end else
+                s_r_valid_next = 1'b1;
+        end
+      
         ST_EXEC_M_AR_POLLING: begin
             if(m_ar_ready & m_ar_valid) begin
                 m_ar_valid_next = 1'b0;
@@ -300,11 +306,10 @@ always_comb begin
 
         ST_EXEC_M_R: begin
             if(m_r_ready & m_r_valid) begin 
+                m_r_ready_next = 1'b1; //Keep reading all available data
                 pr_opCode = 3'd3; //readDataSlave
-                m_r_ready_next = 1'b1;
                 st_exec_next = ST_EXEC_M_R;
-            end
-            else begin
+            end else begin
                 st_exec_next = ST_EXEC_IDLE;
                 m_r_ready_next = 1'b0;
             end
