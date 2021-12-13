@@ -205,7 +205,7 @@ initial begin
     localparam RD_LEN = 0;
     localparam STRIDE = 3;
     localparam TRANS_ID = 5; 
-    localparam WR_LEN = 99;
+    localparam WR_LEN = 0;
     resetN = 1'b0;
     en = 1'b1;
 
@@ -248,10 +248,10 @@ initial begin
     s_aw_addr = limit + 1; // +i increment
     s_aw_id = TRANS_ID + 1;
     s_axi_awlen = WR_LEN; 
-    `TRANSACTION(s_ar_valid,s_ar_ready)
+    `TRANSACTION(s_aw_valid,s_aw_ready)
 
     //Write data
-	for(int i=0;i<s_axi_awlen;i++) begin
+	for(int i=0;i<=s_axi_awlen;i++) begin
 	    s_axi_wdata = i;
         s_axi_wlast = (i == s_axi_awlen-1) ? 1'b1 : 1'b0;
         `TRANSACTION(s_axi_wvalid,s_axi_wready)
@@ -261,7 +261,7 @@ initial begin
     s_aw_addr = BASE_ADDR; // +i increment
     s_aw_id = TRANS_ID;
     s_axi_awlen = WR_LEN; 
-    `TRANSACTION(s_ar_valid,s_ar_ready)
+    `TRANSACTION(s_aw_valid,s_aw_ready)
 
     $finish;
 end
