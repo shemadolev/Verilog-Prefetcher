@@ -243,6 +243,13 @@ initial begin
         #(clock_period*20);
     end
 
+    s_r_ready = 1'b0;
+       s_ar_addr = BASE_ADDR + REQ_NUM * STRIDE;
+        s_ar_len = RD_LEN;
+        s_ar_id = TRANS_ID;
+
+        `TRANSACTION(s_ar_valid,s_ar_ready)
+
     s_ar_addr = BASE_ADDR; //Break stride
     s_ar_len = RD_LEN;
     s_ar_id = TRANS_ID;
