@@ -235,10 +235,12 @@ initial begin
         s_ar_id = TRANS_ID;
 
         `TRANSACTION(s_ar_valid,s_ar_ready)
+	
+	if(i==REQ_NUM-1)
+	    choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
+	   
         #(clock_period*5);
     end
-
-    choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
 
     //Second read req - after that should be full
     s_ar_addr = BASE_ADDR + STRIDE;
@@ -246,9 +248,25 @@ initial begin
     s_ar_id = TRANS_ID;
 
     `TRANSACTION(s_ar_valid,s_ar_ready)
+
+    #(clock_period*5);
+
+
+    //Cleanup on different BURST LEN
+    s_ar_addr = BASE_ADDR + STRIDE;
+    s_ar_len = RD_LEN + 1;
+    s_ar_id = TRANS_ID;
+    s_ar_valid = 1'b1;
     
-    #(clock_period*10);
-	
+    #(clock_period*5);
+    s_ar_valid = 1'b0;
+
+    while(prefetcherTop_dut.prCtrlPath.pr_isCleanup) begin
+        #clock_period;
+    end	
+
+    #(clock_period*5);
+
     $finish;
 end
 
