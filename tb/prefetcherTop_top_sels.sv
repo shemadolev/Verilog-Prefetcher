@@ -244,24 +244,13 @@ initial begin
 
     #(clock_period*5);
 
-    //Write req outside limits
-    s_aw_addr = limit + 1; // +i increment
-    s_aw_id = TRANS_ID + 1;
-    s_axi_awlen = WR_LEN; 
-    `TRANSACTION(s_aw_valid,s_aw_ready)
+    //Read req same ID, outside limits (Should flush)
+    s_ar_addr = limit + 1;
+    s_ar_len = RD_LEN;
+    s_ar_id = TRANS_ID;
+    `TRANSACTION(s_ar_valid,s_ar_ready)
 
-    //Write data
-	for(int i=0;i<=s_axi_awlen;i++) begin
-	    s_axi_wdata = i;
-        s_axi_wlast = (i == s_axi_awlen-1) ? 1'b1 : 1'b0;
-        `TRANSACTION(s_axi_wvalid,s_axi_wready)
-	end
-
-    //Write req within limits
-    s_aw_addr = BASE_ADDR; // +i increment
-    s_aw_id = TRANS_ID;
-    s_axi_awlen = WR_LEN; 
-    `TRANSACTION(s_aw_valid,s_aw_ready)
+    #(clock_period*5);
 
     $finish;
 end
