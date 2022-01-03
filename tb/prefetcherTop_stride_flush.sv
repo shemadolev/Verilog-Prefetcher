@@ -54,7 +54,7 @@ logic [0:ADDR_WIDTH-1]       bar;
 logic [0:ADDR_WIDTH-1]       limit;
 logic [0:QUEUE_WIDTH]       crs_prOutstandingLimit;
 logic [0:WATCHDOG_SIZE-1]   watchdogCnt; 
-logic [0:PRFETCH_FRQ_WIDTH-1] crs_prefetch_freq;
+logic [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle;
 logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
 
@@ -122,7 +122,7 @@ prefetcherTop #(
     .crs_prOutstandingLimit(crs_prOutstandingLimit),
     .watchdogCnt(watchdogCnt), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
-    .crs_prefetch_freq(crs_prefetch_freq),
+    .crs_prBandwidthThrottle(crs_prBandwidthThrottle),
     .errorCode(errorCode)
 );
 
@@ -217,7 +217,7 @@ initial begin
     bar = 0;
     limit = BASE_ADDR * 2;
     crs_prOutstandingLimit = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
-    crs_prefetch_freq = 4;
+    crs_prBandwidthThrottle = 4;
         // Data
     crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
 
