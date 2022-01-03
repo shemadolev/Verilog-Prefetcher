@@ -67,7 +67,7 @@ module prefetcherTop #(
         // Ctrl
     input logic     [0:ADDR_BITS-1] bar,
     input logic     [0:ADDR_BITS-1] limit,
-    input logic     [0:LOG_QUEUE_SIZE] windowSize,
+    input logic     [0:LOG_QUEUE_SIZE] crs_prOutstandingLimit,
     input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
     input logic     [0:PRFETCH_FRQ_WIDTH-1] crs_prefetch_freq,
         // Data
@@ -177,7 +177,7 @@ prefetcherCtrl #(
     .m_r_id(m_r_id),
     .bar(bar), 
     .limit(limit), 
-    .windowSize(windowSize), 
+    .crs_prOutstandingLimit(crs_prOutstandingLimit), 
     .watchdogCnt(watchdogCnt),
     .crs_prefetch_freq(crs_prefetch_freq)
 );

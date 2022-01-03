@@ -52,7 +52,7 @@ logic                       m_aw_valid;
 logic                       m_aw_ready;
 logic [0:ADDR_WIDTH-1]       bar;
 logic [0:ADDR_WIDTH-1]       limit;
-logic [0:QUEUE_WIDTH]       windowSize;
+logic [0:QUEUE_WIDTH]       crs_prOutstandingLimit;
 logic [0:WATCHDOG_SIZE-1]   watchdogCnt; 
 logic [0:PRFETCH_FRQ_WIDTH-1] crs_prefetch_freq;
 logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
@@ -119,7 +119,7 @@ prefetcherTop #(
     .m_aw_ready(m_aw_ready),
     .bar(bar),
     .limit(limit),
-    .windowSize(windowSize),
+    .crs_prOutstandingLimit(crs_prOutstandingLimit),
     .watchdogCnt(watchdogCnt), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
     .crs_prefetch_freq(crs_prefetch_freq),
@@ -211,7 +211,7 @@ initial begin
     watchdogCnt = 10'd1000;
     bar = 0;
     limit = BASE_ADDR * 2;
-    windowSize = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
+    crs_prOutstandingLimit = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
     crs_prefetch_freq = 10;
         // Data
     crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
