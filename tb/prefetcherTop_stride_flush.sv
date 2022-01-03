@@ -244,11 +244,11 @@ initial begin
     end
 
     s_r_ready = 1'b0;
-       s_ar_addr = BASE_ADDR + REQ_NUM * STRIDE;
-        s_ar_len = RD_LEN;
-        s_ar_id = TRANS_ID;
+    s_ar_addr = BASE_ADDR + REQ_NUM * STRIDE;
+    s_ar_len = RD_LEN;
+    s_ar_id = TRANS_ID;
 
-        `TRANSACTION(s_ar_valid,s_ar_ready)
+    `TRANSACTION(s_ar_valid,s_ar_ready)
 
     s_ar_addr = BASE_ADDR; //Break stride
     s_ar_len = RD_LEN;
@@ -260,7 +260,8 @@ initial begin
     #(clock_period*30); //Show stuck on cleanup (has outstanding AR)
 
     choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
-    
+    s_r_ready = 1'b1;    
+
     #(clock_period*30);
 	
     $finish;
