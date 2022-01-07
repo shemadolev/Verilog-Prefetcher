@@ -244,7 +244,7 @@ always_comb begin
             if((s_ar_valid & s_ar_ready) | (s_ar_valid & ~shouldCleanup & (st_pr_cur != ST_PR_CLEANUP) & ~pr_almostFull)) begin
                 if(s_ar_valid & s_ar_ready) begin
                     //Create read req' PR.Data
-                    pr_opCode = 3'd2; //readReqMaster
+                    pr_opCode = 3'd2; //readReqManager
                     pr_m_ar_addr = s_ar_addr;
                     pr_m_ar_len = s_ar_len;
                     s_ar_ready_next = 1'b0; // TODO stay raised, ready for next request
@@ -307,7 +307,7 @@ always_comb begin
         ST_EXEC_M_R: begin
             if(m_r_ready & m_r_valid) begin 
                 m_r_ready_next = 1'b1; //Keep reading all available data
-                pr_opCode = 3'd3; //readDataSlave
+                pr_opCode = 3'd3; //readDataSubordinate
                 st_exec_next = ST_EXEC_M_R;
             end else begin
                 st_exec_next = ST_EXEC_IDLE;
