@@ -60,9 +60,9 @@ module prefetcherCtrl #(
     //CR Space
     input logic     [0:ADDR_BITS-1] bar,
     input logic     [0:ADDR_BITS-1] limit,
-    input logic     [0:LOG_QUEUE_SIZE] windowSize,
+    input logic     [0:LOG_QUEUE_SIZE] crs_prOutstandingLimit,
     input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
-    input logic     [0:PRFETCH_FRQ_WIDTH-1] crs_prefetch_freq
+    input logic     [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle
 );
 
 // Slice's context
@@ -103,7 +103,7 @@ logic prefetch_freq_pulse;
 clkDivN #(.WIDTH(PRFETCH_FRQ_WIDTH)) prefetchFreqClkDiv
             (.clk(clk),
             .resetN(resetN & ~(m_ar_valid & m_ar_ready)), //Reset timer on every successful read req'
-            .preScaleValue(crs_prefetch_freq),
+            .preScaleValue(crs_prBandwidthThrottle),
             .slowEnPulse(prefetch_freq_pulse)
             );
 
@@ -200,7 +200,7 @@ always_comb begin
                 if (m_ar_valid & m_ar_ready)
                     prefetchAddr_next = m_ar_addr + stride_reg;
 
-                if((pr_reqCnt < windowSize) && ~pr_almostFull && prefetchAddrInRange) //Should fetch next block
+                if((pr_reqCnt < crs_prOutstandingLimit) && ~pr_almostFull && prefetchAddrInRange) //Should fetch next block
                     prefetchAddr_valid_next = 1'b1; 
 
             end
