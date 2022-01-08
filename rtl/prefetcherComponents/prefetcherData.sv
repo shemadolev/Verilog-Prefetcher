@@ -3,9 +3,13 @@
  *              * Stores outstanding requests and data responses from DRAM
  *              * Supports 4 opreations, for each block in the queue, according to 5 opcodes: 
                     0 - NOP
-                    1 - readReqPref //todo
-                    2 - readReqMaster(AXI AR/Read Request) //todo
-                    3 - readDataSlave(AXI R/Read Data): Stores reqData & reqLast into the next block that expects data.
+                    1 - readReqPref - associated with a prefetched read request. 
+                                        Reserves a block, or multiple blocks in a burst-case, for the data response from the subordinate, 
+                                        doesn't affect the promise counter.
+                    2 - readReqManager(AXI AR/Read Request) - associates with a read request from the manager. 
+                                                                Reserves a block, or multiple blocks in a burst-case, for the data response from the subordinate, 
+                                                                and increments the promise counter of this block.
+                    3 - readDataSubordinate(AXI R/Read Data): Stores reqData & reqLast into the next block that expects data.
                     4 - readDataPromise: Pops head if fulfilled all head promises, and nextHead is valid & his promise > 0,
                                             mark that a read successfully fulfilled.
                 * errorCode:
@@ -55,7 +59,7 @@ logic [0:PROMISE_WIDTH-1] promiseCnt [0:QUEUE_SIZE-1];
 logic [0:ADDR_BITS-1] blockAddrMat [0:QUEUE_SIZE-1]; //should be inserted block aligned
 //queue helpers
 logic [0:LOG_QUEUE_SIZE-1] headPtr, tailPtr, addrIdx, burst_len;
-logic [0:LOG_QUEUE_SIZE-1] readDataPtr; //Points to next block that readDataSlave writes to 
+logic [0:LOG_QUEUE_SIZE-1] readDataPtr; //Points to next block that readDataSubordinate writes to 
 logic [0:LOG_QUEUE_SIZE] validCnt;
 logic isEmpty, isFull, dataReady_curBurst, dataReady_nxtBurst, active;
 logic [0:LOG_QUEUE_SIZE-1] burstOffset; //For readDataPromise: Offset inside a burst
@@ -102,7 +106,7 @@ assign dataReady_nxtBurst = (validVec[headPtr + burst_len] && dataValidVec[headP
 assign pr_r_valid = (dataReady_curBurst || ((promiseCnt[headPtr] == {(PROMISE_WIDTH){1'b0}}) && dataReady_nxtBurst)) & active;
 assign hasOutstanding = |((dataValidVec & validVec) ^ validVec);
 
-// 0 - NOP ,1 - readReqPref,  2 - readReqMaster(AXI AR/Read Request), 3 - readDataSlave(AXI R/Read Data), 4 - readDataPromise
+// 0 - NOP ,1 - readReqPref,  2 - readReqManager(AXI AR/Read Request), 3 - readDataSubordinate(AXI R/Read Data), 4 - readDataPromise
 
 always_ff @(posedge clk or negedge resetN)
 begin
@@ -139,7 +143,7 @@ begin
                 end
             end
 
-            // readReqMaster (Read requests which were initiated by transactions from the MASTER)
+            // readReqManager (Read requests which were initiated by transactions from the MASTER)
             3'd2: begin
                 if(addrHit) begin
                     promiseCnt[addrIdx] <= promiseCnt[addrIdx] + 1'd1;
@@ -160,7 +164,7 @@ begin
                 end
             end
 
-            // readDataSlave (Receiving read data from SLAVE)
+            // readDataSubordinate (Receiving read data from SLAVE)
             3'd3: begin
                 if(validVec[readDataPtr] != 1'b0) begin
                     dataValidVec[readDataPtr] <= 1'b1;
