@@ -65,10 +65,10 @@ module prefetcherTop #(
 
     //CR Space
         // Ctrl
-    input logic     [0:ADDR_BITS-1] bar,
-    input logic     [0:ADDR_BITS-1] limit,
+    input logic     [0:ADDR_BITS-1] crs_bar,
+    input logic     [0:ADDR_BITS-1] crs_limit,
     input logic     [0:LOG_QUEUE_SIZE] crs_prOutstandingLimit,
-    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
+    input logic     [0:WATCHDOG_SIZE-1] crs_watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
     input logic     [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle,
         // Data
     input logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer,
@@ -175,22 +175,22 @@ prefetcherCtrl #(
     .m_r_valid(ctrl_m_r_valid), 
     .m_r_ready(ctrl_m_r_ready),
     .m_r_id(m_r_id),
-    .bar(bar), 
-    .limit(limit), 
+    .crs_bar(crs_bar), 
+    .crs_limit(crs_limit), 
     .crs_prOutstandingLimit(crs_prOutstandingLimit), 
-    .watchdogCnt(watchdogCnt),
+    .crs_watchdogCnt(crs_watchdogCnt),
     .crs_prBandwidthThrottle(crs_prBandwidthThrottle)
 );
 
 always_comb begin
     prDataPath_resetN = resetN & ~pr_flush;
-    ctrlFlush = (s_ar_valid & (~(s_ar_addr >= bar & s_ar_addr <= limit) & (ctrl_context_valid & pr_m_ar_id == s_ar_id))) //ReadReq outside limits but same tag
-                | (s_aw_valid & ((s_aw_addr >= bar & s_aw_addr <= limit) | (ctrl_context_valid & pr_m_ar_id == s_aw_id))); //WriteReq in limits or same tag
-    //todo When checking (_addr <= limit), _len should also be considered
-    sel_ar_pr = ~s_ar_valid | cleanup_st | ctrlFlush | (s_ar_valid & (s_ar_addr >= bar & s_ar_addr <= limit)) | ctrl_m_ar_valid; //todo consider removing the 'cleanup' condition, to enable req's with other IDs
+    ctrlFlush = (s_ar_valid & (~(s_ar_addr >= crs_bar & s_ar_addr <= crs_limit) & (ctrl_context_valid & pr_m_ar_id == s_ar_id))) //ReadReq outside limits but same tag
+                | (s_aw_valid & ((s_aw_addr >= crs_bar & s_aw_addr <= crs_limit) | (ctrl_context_valid & pr_m_ar_id == s_aw_id))); //WriteReq in limits or same tag
+    //todo When checking (_addr <= crs_limit), _len should also be considered
+    sel_ar_pr = ~s_ar_valid | cleanup_st | ctrlFlush | (s_ar_valid & (s_ar_addr >= crs_bar & s_ar_addr <= crs_limit)) | ctrl_m_ar_valid; //todo consider removing the 'cleanup' condition, to enable req's with other IDs
     sel_r_pr = ~m_r_valid | (m_r_valid & (ctrl_context_valid & (pr_m_ar_id == m_r_id))) | ctrl_s_r_valid;
 
-    if(s_aw_valid && ctrl_context_valid && ((pr_m_ar_id == s_aw_id) || (s_aw_addr >= bar && s_aw_addr <= limit))) begin
+    if(s_aw_valid && ctrl_context_valid && ((pr_m_ar_id == s_aw_id) || (s_aw_addr >= crs_bar && s_aw_addr <= crs_limit))) begin
         ctrlFlush = 1'b1; //This stops the controller from sending ar_ready=1 to the master
         //Block AW channel until cleanup is done
         s_aw_ready = 1'b0;

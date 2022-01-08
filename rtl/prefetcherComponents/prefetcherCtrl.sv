@@ -58,10 +58,10 @@ module prefetcherCtrl #(
     input logic [0:TID_WIDTH-1] m_r_id,
 
     //CR Space
-    input logic     [0:ADDR_BITS-1] bar,
-    input logic     [0:ADDR_BITS-1] limit,
+    input logic     [0:ADDR_BITS-1] crs_bar,
+    input logic     [0:ADDR_BITS-1] crs_limit,
     input logic     [0:LOG_QUEUE_SIZE] crs_prOutstandingLimit,
-    input logic     [0:WATCHDOG_SIZE-1] watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
+    input logic     [0:WATCHDOG_SIZE-1] crs_watchdogCnt, //the size of the counter that is used to divide the clk freq for the watchdog
     input logic     [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle
 );
 
@@ -94,7 +94,7 @@ logic watchdogHit;
 logic watchdogHit_d;
 logic st_exec_changed;
 clkDivN #(.WIDTH(WATCHDOG_SIZE)) watchdogFlag
-            (.clk(clk), .resetN(resetN), .preScaleValue(watchdogCnt),
+            (.clk(clk), .resetN(resetN), .preScaleValue(crs_watchdogCnt),
              .slowEnPulse(watchdogHit), .slowEnPulse_d(watchdogHit_d)
             );
 
@@ -321,7 +321,7 @@ end
 // signals assignment
 assign stride_sampled = s_ar_addr - s_ar_addr_prev;
 assign zeroStride = (stride_sampled == {ADDR_BITS{1'b0}});
-assign prefetchAddrInRange = (prefetchAddr_reg >= bar) && (prefetchAddr_reg <= limit);
+assign prefetchAddrInRange = (prefetchAddr_reg >= crs_bar) && (prefetchAddr_reg <= crs_limit);
 assign strideMiss = s_ar_valid && stride_learned && (stride_reg != stride_sampled) && !zeroStride;
 assign stride_learned = st_pr_cur == ST_PR_ACTIVE;
 assign shouldCleanup = shouldCleanup_context | ~valid_burst | ctrlFlush;
