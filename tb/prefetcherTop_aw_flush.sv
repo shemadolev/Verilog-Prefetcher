@@ -27,33 +27,37 @@ logic                       resetN;
 logic                       s_ar_valid;
 logic                       s_ar_ready;
 logic [0:BURST_LEN_WIDTH-1] s_ar_len;
-logic [0:ADDR_WIDTH-1]       s_ar_addr; 
-logic [0:ID_WIDTH-1]       s_ar_id;
+logic [0:ADDR_WIDTH-1]      s_ar_addr; 
+logic [0:ID_WIDTH-1]        s_ar_id;
 logic                       m_ar_valid;
 logic                       m_ar_ready;
 logic [0:BURST_LEN_WIDTH-1] m_ar_len;
-logic [0:ADDR_WIDTH-1]       m_ar_addr;
-logic [0:ID_WIDTH-1]       m_ar_id;
+logic [0:ADDR_WIDTH-1]      m_ar_addr;
+logic [0:ID_WIDTH-1]        m_ar_id;
 logic                       s_r_valid;
 logic                       s_r_ready;
 logic                       s_r_last;
 logic [0:DATA_WIDTH-1]      s_r_data;
-logic [0:ID_WIDTH-1]       s_r_id;
+logic [0:ID_WIDTH-1]        s_r_id;
 logic                       m_r_valid;
 logic                       m_r_ready;
 logic                       m_r_last;
 logic [0:DATA_WIDTH-1]      m_r_data;
-logic [0:ID_WIDTH-1]       m_r_id;
+logic [0:ID_WIDTH-1]        m_r_id;
 logic                       s_aw_valid;
 logic                       s_aw_ready;
-logic [0:ADDR_WIDTH-1]       s_aw_addr;
-logic [0:ID_WIDTH-1]       s_aw_id;
+logic [0:BURST_LEN_WIDTH-1] s_aw_len;
+logic [0:ADDR_BITS-1]       s_aw_addr;
+logic [0:TID_WIDTH-1]       s_aw_id;
 logic                       m_aw_valid;
 logic                       m_aw_ready;
-logic [0:ADDR_WIDTH-1]       bar;
-logic [0:ADDR_WIDTH-1]       limit;
+logic [0:BURST_LEN_WIDTH-1] m_aw_len;
+logic [0:ADDR_BITS-1]       m_aw_addr;
+logic [0:TID_WIDTH-1]       m_aw_id;
+logic [0:ADDR_WIDTH-1]      bar;
+logic [0:ADDR_WIDTH-1]      limit;
 logic [0:QUEUE_WIDTH]       crs_prOutstandingLimit;
-logic [0:WATCHDOG_WIDTH-1]   watchdogCnt; 
+logic [0:WATCHDOG_WIDTH-1]  watchdogCnt; 
 logic [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle;
 logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
@@ -111,6 +115,16 @@ prefetcherTop #(
     .m_r_last(m_r_last),
     .m_r_data(m_r_data),
     .m_r_id(m_r_id),
+    .s_aw_valid(s_aw_valid),
+    .s_aw_ready(s_aw_ready),
+    .s_aw_len(s_aw_len),
+    .s_aw_addr(s_aw_addr),
+    .s_aw_id(s_aw_id),
+    .m_aw_valid(m_aw_valid),
+    .m_aw_ready(m_aw_ready),
+    .m_aw_len(m_aw_len),
+    .m_aw_addr(m_aw_addr),
+    .m_aw_id(m_aw_id),
     .s_aw_valid(s_aw_valid),
     .s_aw_ready(s_aw_ready),
     .s_aw_addr(s_aw_addr),
