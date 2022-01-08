@@ -9,7 +9,7 @@ module prefetcherTop_burst_read();
 localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
 localparam QUEUE_WIDTH = 3'd4; 
-localparam WATCHDOG_SIZE = 10'd10; 
+localparam WATCHDOG_WIDTH = 10'd10; 
 localparam BURST_LEN_WIDTH = 4'd8; 
 localparam ID_WIDTH = 4'd8; 
 localparam DATA_SIZE_ENCODE = 3'd0;
@@ -53,7 +53,7 @@ logic                       m_aw_ready;
 logic [0:ADDR_WIDTH-1]       bar;
 logic [0:ADDR_WIDTH-1]       limit;
 logic [0:QUEUE_WIDTH]       crs_prOutstandingLimit;
-logic [0:WATCHDOG_SIZE-1]   watchdogCnt; 
+logic [0:WATCHDOG_WIDTH-1]   watchdogCnt; 
 logic [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle;
 logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
@@ -81,7 +81,7 @@ logic [1:0]             s_axi_rresp;
 prefetcherTop #(
 .ADDR_BITS(ADDR_WIDTH),
 .LOG_QUEUE_SIZE(QUEUE_WIDTH),
-.WATCHDOG_SIZE(WATCHDOG_SIZE),
+.WATCHDOG_WIDTH(WATCHDOG_WIDTH),
 .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
 .TID_WIDTH(ID_WIDTH),
 .LOG_BLOCK_DATA_BYTES(DATA_SIZE_ENCODE),

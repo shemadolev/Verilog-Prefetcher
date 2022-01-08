@@ -7,7 +7,7 @@
 module prefetcherCtrl_tb();
     localparam ADDR_BITS = 64; //64bit address 2^64
     localparam LOG_QUEUE_SIZE = 3'd6; // the size of the queue [2^x] 
-    localparam WATCHDOG_SIZE = 10'd10; // number of bits for the watchdog counter
+    localparam WATCHDOG_WIDTH = 10'd10; // number of bits for the watchdog counter
     localparam BURST_LEN_WIDTH = 4'd8; //NVDLA max is 3; AXI4 supports up to 8 bits
     localparam TID_WIDTH = 4'd8; //NVDLA max is 3; AXI4 supports up to 8 bits
 
@@ -62,13 +62,13 @@ module prefetcherCtrl_tb();
      logic     [0:ADDR_BITS-1] bar;
      logic     [0:ADDR_BITS-1] limit;
      logic     [0:LOG_QUEUE_SIZE] windowSize;
-     logic     [0:WATCHDOG_SIZE-1] watchdogCnt; //the size of the counter that is used to divide the clk freq for the watchdog
+     logic     [0:WATCHDOG_WIDTH-1] watchdogCnt; //the size of the counter that is used to divide the clk freq for the watchdog
 
 
     prefetcherCtrl #(
         .ADDR_BITS(ADDR_BITS),
         .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
-        .WATCHDOG_SIZE(WATCHDOG_SIZE),
+        .WATCHDOG_WIDTH(WATCHDOG_WIDTH),
         .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
         .TID_WIDTH(TID_WIDTH)
     ) prefetcherCtrl_dut (

@@ -8,7 +8,7 @@ module prefetcherTop_tb();
 
 localparam ADDR_BITS = 64; 
 localparam LOG_QUEUE_SIZE = 3'd3; 
-localparam WATCHDOG_SIZE = 10'd10; 
+localparam WATCHDOG_WIDTH = 10'd10; 
 localparam BURST_LEN_WIDTH = 4'd8; 
 localparam TID_WIDTH = 4'd8; 
 localparam LOG_BLOCK_DATA_BYTES = 3'd0;
@@ -47,14 +47,14 @@ logic m_aw_ready;
 logic     [0:ADDR_BITS-1] bar;
 logic     [0:ADDR_BITS-1] limit;
 logic     [0:LOG_QUEUE_SIZE] windowSize;
-logic     [0:WATCHDOG_SIZE-1] watchdogCnt; 
+logic     [0:WATCHDOG_WIDTH-1] watchdogCnt; 
 logic     [0:LOG_QUEUE_SIZE-1] crs_almostFullSpacer;
 logic    [0:2] errorCode;
 
 prefetcherTop #(
 .ADDR_BITS(ADDR_BITS),
 .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
-.WATCHDOG_SIZE(WATCHDOG_SIZE),
+.WATCHDOG_WIDTH(WATCHDOG_WIDTH),
 .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
 .TID_WIDTH(TID_WIDTH),
 .LOG_BLOCK_DATA_BYTES(LOG_BLOCK_DATA_BYTES),
