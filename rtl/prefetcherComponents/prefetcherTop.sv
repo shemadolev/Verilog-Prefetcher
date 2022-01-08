@@ -52,16 +52,16 @@ module prefetcherTop #(
     //AXI AW (Write Request) slave port
     input logic s_aw_valid,
     output logic s_aw_ready,
-    // input logic [0:BURST_LEN_WIDTH-1] s_aw_len,
+    input logic [0:BURST_LEN_WIDTH-1] s_aw_len,
     input logic [0:ADDR_BITS-1] s_aw_addr,
     input logic [0:TID_WIDTH-1] s_aw_id,
 
     //AXI AW (Write Request) master port
     output logic m_aw_valid,
     input logic m_aw_ready,
-    // output logic [0:BURST_LEN_WIDTH-1] m_aw_len,
-    // output logic [0:ADDR_BITS-1] m_aw_addr,
-    // output logic [0:TID_WIDTH-1] m_aw_id,
+    output logic [0:BURST_LEN_WIDTH-1] m_aw_len,
+    output logic [0:ADDR_BITS-1] m_aw_addr,
+    output logic [0:TID_WIDTH-1] m_aw_id,
 
     //CR Space
         // Ctrl
@@ -181,6 +181,11 @@ prefetcherCtrl #(
     .crs_watchdogCnt(crs_watchdogCnt),
     .crs_prBandwidthThrottle(crs_prBandwidthThrottle)
 );
+
+//Assign directly unchanged AW signals
+assign m_aw_len = s_aw_len;
+assign m_aw_addr = s_aw_addr;
+assign m_aw_id = s_aw_id;
 
 always_comb begin
     prDataPath_resetN = resetN & ~pr_flush;
