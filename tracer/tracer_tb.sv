@@ -1,7 +1,6 @@
-module tb;
+module tracer_tb;
   int 	 fd; 			// Variable for file descriptor handle
-  int 	 idx;
-  string str;
+  int 	 value;
 
   initial begin
     // 1. Lets first open a new file and write some contents into it
@@ -14,8 +13,8 @@ module tb;
     fd = $fopen ("trial", "r");
 
     // fscanf returns the number of matches
-    while ($fscanf (fd, "%s = %0d", str, idx) == 2) begin
-      $display ("Line: %s = %0d", str, idx);
+    while ($fscanf (fd, "0x%h", value) == 1) begin
+      $display ("Line: %h", value);
     end
 
     // Close this file handle
