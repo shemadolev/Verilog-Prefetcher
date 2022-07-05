@@ -203,6 +203,7 @@ assign m_r_valid = choose_ddr_r ? ddr_m_r_valid : 1'b0;
 // Creating a tracer
 int 	 fd; 			// Variable for file descriptor handle
 int 	 value;
+string line;
 
 initial begin
     localparam BASE_ADDR = 16'h0eef;
@@ -233,12 +234,17 @@ initial begin
     resetN=1'b1;
 
     // 2. Let us now read back the data we wrote in the previous step
-    fd = $fopen ("../trace.log", "r");
+    fd = $fopen ("/users/epiddo/Workshop/projectB/traces/ispass-2009-NN_1_img.csv", "r");
 
     // fscanf returns the number of matches
-    while ($fscanf (fd, "0x%h", value) == 1) begin
-        $display ("Line: %h", value);
-    end
+    //while ($fscanf (fd, "%d,", value) == 1) begin
+    //    $display ("Line: %h", value);
+    //end
+
+    while(!$feof(fd)) begin
+$fgets(line,fd);
+$display("%s",line);
+end
 
     //Read req of BASE_ADDR
     choose_ddr_r = 1'b0; //Block DDR's r_valid
