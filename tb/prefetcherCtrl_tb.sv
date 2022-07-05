@@ -104,10 +104,10 @@ module prefetcherCtrl_tb();
         .m_r_valid(m_r_valid),
         .m_r_ready(m_r_ready),
         .m_r_id(m_r_id),
-        .bar(bar),
-        .limit(limit),
+        .crs_bar(bar),
+        .crs_limit(limit),
         .windowSize(windowSize),
-        .watchdogCnt(watchdogCnt) //the size of the counter that is used to divide the clk freq for the watchdog
+        .crs_watchdogCnt(watchdogCnt) //the size of the counter that is used to divide the clk freq for the watchdog
     );
 
     initial begin

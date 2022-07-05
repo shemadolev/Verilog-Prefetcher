@@ -55,7 +55,7 @@
     $display("  valid_burst %b",MOD.valid_burst); \
     if(MOD.stride_learned) \
         $display("  stride_reg 0x%h",MOD.stride_reg); \
-        $display("  bar 0x%h, limit 0x%h",MOD.bar, MOD.limit); \
+        $display("  bar 0x%h, limit 0x%h",MOD.crs_bar, MOD.crs_limit); \
     if(MOD.pr_context_valid == 1) begin \
         $display("  pr_m_ar_len %d",MOD.pr_m_ar_len); \
         $display("  pr_m_ar_id %d",MOD.pr_m_ar_id); \

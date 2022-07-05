@@ -89,10 +89,10 @@ prefetcherTop #(
     .s_aw_id(s_aw_id),
     .m_aw_valid(m_aw_valid),
     .m_aw_ready(m_aw_ready),
-    .bar(bar),
-    .limit(limit),
+    .crs_bar(bar),
+    .crs_limit(limit),
     .windowSize(windowSize),
-    .watchdogCnt(watchdogCnt), 
+    .crs_watchdogCnt(watchdogCnt), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
     .errorCode(errorCode)
 );

@@ -200,6 +200,10 @@ logic choose_ddr_r = 1'b1;
 
 assign m_r_valid = choose_ddr_r ? ddr_m_r_valid : 1'b0;
 
+// Creating a tracer
+int 	 fd; 			// Variable for file descriptor handle
+int 	 value;
+
 initial begin
     localparam BASE_ADDR = 16'h0eef;
     localparam RD_LEN = 0;
@@ -227,10 +231,6 @@ initial begin
 
     #clock_period;
     resetN=1'b1;
-
-    // Creating a tracer
-    int 	 fd; 			// Variable for file descriptor handle
-    int 	 value;
 
     // 2. Let us now read back the data we wrote in the previous step
     fd = $fopen ("../trace.log", "r");
