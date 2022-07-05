@@ -54,10 +54,10 @@ logic                       m_aw_ready;
 logic [0:BURST_LEN_WIDTH-1] m_aw_len;
 logic [0:ADDR_WIDTH-1]       m_aw_addr;
 logic [0:ID_WIDTH-1]       m_aw_id;
-logic [0:ADDR_WIDTH-1]      bar;
-logic [0:ADDR_WIDTH-1]      limit;
+logic [0:ADDR_WIDTH-1]      crs_bar;
+logic [0:ADDR_WIDTH-1]      crs_limit;
 logic [0:QUEUE_WIDTH]       crs_prOutstandingLimit;
-logic [0:WATCHDOG_WIDTH-1]  watchdogCnt; 
+logic [0:WATCHDOG_WIDTH-1]  crs_watchdogCnt; 
 logic [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle;
 logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
@@ -131,10 +131,10 @@ prefetcherTop #(
     .s_aw_id(s_aw_id),
     .m_aw_valid(m_aw_valid),
     .m_aw_ready(m_aw_ready),
-    .bar(bar),
-    .limit(limit),
+    .crs_bar(crs_bar),
+    .crs_limit(crs_limit),
     .crs_prOutstandingLimit(crs_prOutstandingLimit),
-    .watchdogCnt(watchdogCnt), 
+    .crs_watchdogCnt(crs_watchdogCnt), 
     .crs_almostFullSpacer(crs_almostFullSpacer),
     .crs_prBandwidthThrottle(crs_prBandwidthThrottle),
     .errorCode(errorCode)
@@ -222,9 +222,9 @@ initial begin
 
 //CR Space
         // Ctrl
-    watchdogCnt = 10'd1000;
-    bar = 0;
-    limit = BASE_ADDR * 2;
+    crs_watchdogCnt = 10'd1000;
+    crs_bar = 0;
+    crs_limit = BASE_ADDR * 2;
     crs_prOutstandingLimit = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
     crs_prBandwidthThrottle = 10;
         // Data
