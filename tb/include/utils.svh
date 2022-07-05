@@ -5,9 +5,9 @@
 `define TRANSACTION(valid,ready) \
     valid = 1'b1; \
     while(~(valid & ready)) begin \
-        #clock_period; \
+        @(posedge clk); \
     end \
-    #clock_period; \
+    @(posedge clk); \
     valid = 1'b0;
 
 `define tick(clk) \
