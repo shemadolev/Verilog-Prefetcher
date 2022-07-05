@@ -4,7 +4,7 @@
 `include "print.svh"
 `include "utils.svh"
 
-module prefetcherTop_id_flush();
+module prefetcherTop_gpgpusim_traces();
 
 localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
