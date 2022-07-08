@@ -200,10 +200,9 @@ logic choose_ddr_r = 1'b1;
 
 assign m_r_valid = choose_ddr_r ? ddr_m_r_valid : 1'b0;
 
-// Creating a tracer
-int 	 fd; 			// Variable for file descriptor handle
-int 	 value;
-string line;
+// Tracer's vars
+int 	 fd; 			    // file descriptor handle
+int 	 trace_mem_addr;    // var for address extraction from the file
 
 initial begin
     localparam BASE_ADDR = 16'h0eef;
@@ -234,49 +233,17 @@ initial begin
     resetN=1'b1;
 
     // 2. Let us now read back the data we wrote in the previous step
-    fd = $fopen ("/users/epiddo/Workshop/projectB/traces/ispass-2009-NN_1_img.csv", "r");
+    fd = $fopen ("/users/epiddo/Workshop/projectB/traces/small_test.trace", "r");
 
-    // fscanf returns the number of matches
-    //while ($fscanf (fd, "%d,", value) == 1) begin
-    //    $display ("Line: %h", value);
-    //end
-
-    while(!$feof(fd)) begin
-$fgets(line,fd);
-$display("%s",line);
-end
-
-    //Read req of BASE_ADDR
-    choose_ddr_r = 1'b0; //Block DDR's r_valid
-
-    s_ar_addr = BASE_ADDR;
-    s_ar_len = RD_LEN;
-    s_ar_id = TRANS_ID;
-
-    `TRANSACTION(s_ar_valid,s_ar_ready)
-
-    #(clock_period*20);
-
-    //Break on id
-    s_ar_addr = BASE_ADDR; 
-    s_ar_len = RD_LEN;
-    s_ar_id = TRANS_ID + 1;
-    s_ar_valid = 1'b1;
-
-    #(clock_period*10);
-
-    //Cleanup should end (return to IDLE) once all promised data is returned + no outstanding data
-
-    //[Outstanding data remained]
-    s_r_ready = 1'b0; //Disable passing data from PR to MASTER
-    choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
-
-    #(clock_period*10); //Show stuck on cleanup (has outstanding AR)
-    
-    //[Promised data remained]
-    s_r_ready = 1'b1; //Enable passing data from PR to MASTER
-    
-    #(clock_period*10);
+    // fscanf - scan line after line in the trace's file
+    while ($fscanf (fd, "%h,", trace_mem_addr) == 1) begin
+        // Extract only the relevant address width from the trace addresses
+        s_ar_addr = trace_mem_addr[ADDR_WIDTH-1:0];
+        // Set AXI signals to commit transaction to the prefetcher
+        s_ar_len = RD_LEN;
+        s_ar_id = TRANS_ID;
+        `TRANSACTION(s_ar_valid,s_ar_ready)
+    end
 	
     // Close the file handle
     $fclose(fd);
