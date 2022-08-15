@@ -4,7 +4,7 @@
 `include "print.svh"
 `include "utils.svh"
 
-module prefetcherTop_gpgpusim_traces();
+module prefetcherTop_fifo_dram();
 
 localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
@@ -18,6 +18,8 @@ localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd3; 
 localparam PIPELINE_OUTPUT = 1;
 localparam PRFETCH_FRQ_WIDTH = 3'd6;
+localparam FIFO_DEPTH = 5'd16;
+localparam FIFO_DELAY_ENABLE = 1;
 
 //########### prefetcherTop ###########//
     // + axi signals (prefetcher<->DDR)
@@ -74,19 +76,19 @@ logic [ID_WIDTH-1:0]    s_axi_bid;
 logic [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error can be sent
 logic                   s_axi_bvalid;
 logic                   s_axi_bready;
-logic			ddr_m_r_valid;
+logic			        fifo_m_r_valid;
 
 logic [1:0]             s_axi_rresp;
 
 prefetcherTop #(
-.ADDR_BITS(ADDR_WIDTH),
-.LOG_QUEUE_SIZE(QUEUE_WIDTH),
-.WATCHDOG_WIDTH(WATCHDOG_WIDTH),
-.BURST_LEN_WIDTH(BURST_LEN_WIDTH),
-.TID_WIDTH(ID_WIDTH),
-.LOG_BLOCK_DATA_BYTES(DATA_SIZE_ENCODE),
-.PROMISE_WIDTH(PROMISE_WIDTH),
-.PRFETCH_FRQ_WIDTH(PRFETCH_FRQ_WIDTH)
+    .ADDR_BITS(ADDR_WIDTH),
+    .LOG_QUEUE_SIZE(QUEUE_WIDTH),
+    .WATCHDOG_WIDTH(WATCHDOG_WIDTH),
+    .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
+    .TID_WIDTH(ID_WIDTH),
+    .LOG_BLOCK_DATA_BYTES(DATA_SIZE_ENCODE),
+    .PROMISE_WIDTH(PROMISE_WIDTH),
+    .PRFETCH_FRQ_WIDTH(PRFETCH_FRQ_WIDTH)
 ) prefetcherTop_dut (
     .clk(clk),
     .en(en), 
@@ -126,17 +128,16 @@ prefetcherTop #(
     .errorCode(errorCode)
 );
 
-axi_ram #
-(
-    // Width of data bus in bits
+dram #(
     .DATA_WIDTH(DATA_WIDTH),
-    // Width of address bus in bits
     .ADDR_WIDTH(ADDR_WIDTH),
-    // Width of ID signal
     .ID_WIDTH(ID_WIDTH),
-    // Extra pipeline register on output
-    .PIPELINE_OUTPUT(PIPELINE_OUTPUT)
-) axi_ram_inst (
+    .PIPELINE_OUTPUT(PIPELINE_OUTPUT),
+    .WRITE_FIFO_DEPTH(FIFO_DEPTH),
+    .READ_FIFO_DEPTH(FIFO_DEPTH),
+    .WRITE_FIFO_DELAY(FIFO_DELAY_ENABLE),
+    .READ_FIFO_DELAY(FIFO_DELAY_ENABLE)
+) dram_dut (
     .clk(clk),
     .rst(rst),
     .s_axi_awid(s_aw_id),
@@ -147,8 +148,8 @@ axi_ram #
     .s_axi_awlock(1'b0), //Irrelevant when accessing a single port
     .s_axi_awcache(4'b0000),
     .s_axi_awprot(3'b000),
-    .s_axi_awvalid(m_aw_valid),
-    .s_axi_awready(m_aw_ready),
+    .s_axi_awvalid(s_axi_awvalid),
+    .s_axi_awready(s_axi_awready),
     .s_axi_wdata(s_axi_wdata),
     .s_axi_wstrb(s_axi_wstrb),
     .s_axi_wlast(s_axi_wlast),
@@ -158,7 +159,7 @@ axi_ram #
     .s_axi_bresp(s_axi_bresp),
     .s_axi_bvalid(s_axi_bvalid),
     .s_axi_bready(s_axi_bready),
-    .s_axi_arid(m_ar_id),// read request
+    .s_axi_arid(m_ar_id),
     .s_axi_araddr(m_ar_addr),
     .s_axi_arlen(m_ar_len),
     .s_axi_arsize(DATA_SIZE_ENCODE),
@@ -168,13 +169,15 @@ axi_ram #
     .s_axi_arprot(3'b000), // Irrelevant, used for access premissions 
     .s_axi_arvalid(m_ar_valid),
     .s_axi_arready(m_ar_ready),
-    .s_axi_rid(m_r_id), //read data
+    .s_axi_rid(m_r_id),
     .s_axi_rdata(m_r_data),
     .s_axi_rresp(s_axi_rresp),
     .s_axi_rlast(m_r_last),
-    .s_axi_rvalid(ddr_m_r_valid),
+    .s_axi_rvalid(fifo_m_r_valid),
     .s_axi_rready(m_r_ready)
 );
+
+
 
 assign rst = ~resetN;
 
@@ -198,7 +201,7 @@ end
 
 logic choose_ddr_r = 1'b1;
 
-assign m_r_valid = choose_ddr_r ? ddr_m_r_valid : 1'b0;
+assign m_r_valid = choose_ddr_r ? fifo_m_r_valid : 1'b0;
 
 // Tracer's vars
 int 	 fd; 			    // file descriptor handle

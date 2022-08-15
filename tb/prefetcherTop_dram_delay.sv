@@ -4,7 +4,7 @@
 `include "print.svh"
 `include "utils.svh"
 
-module prefetcherTop_gpgpusim_traces();
+module prefetcherTop_dram_delay();
 
 localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
@@ -16,7 +16,7 @@ localparam DATA_SIZE_ENCODE = 3'd0;
 localparam DATA_WIDTH = (1<<DATA_SIZE_ENCODE)<<3;
 localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd3; 
-localparam PIPELINE_OUTPUT = 1;
+localparam PIPELINE_OUTPUT = 0;
 localparam PRFETCH_FRQ_WIDTH = 3'd6;
 
 //########### prefetcherTop ###########//
@@ -27,33 +27,37 @@ logic                       resetN;
 logic                       s_ar_valid;
 logic                       s_ar_ready;
 logic [0:BURST_LEN_WIDTH-1] s_ar_len;
-logic [0:ADDR_WIDTH-1]       s_ar_addr; 
-logic [0:ID_WIDTH-1]       s_ar_id;
+logic [0:ADDR_WIDTH-1]      s_ar_addr; 
+logic [0:ID_WIDTH-1]        s_ar_id;
 logic                       m_ar_valid;
 logic                       m_ar_ready;
 logic [0:BURST_LEN_WIDTH-1] m_ar_len;
-logic [0:ADDR_WIDTH-1]       m_ar_addr;
-logic [0:ID_WIDTH-1]       m_ar_id;
+logic [0:ADDR_WIDTH-1]      m_ar_addr;
+logic [0:ID_WIDTH-1]        m_ar_id;
 logic                       s_r_valid;
 logic                       s_r_ready;
 logic                       s_r_last;
 logic [0:DATA_WIDTH-1]      s_r_data;
-logic [0:ID_WIDTH-1]       s_r_id;
+logic [0:ID_WIDTH-1]        s_r_id;
 logic                       m_r_valid;
 logic                       m_r_ready;
 logic                       m_r_last;
 logic [0:DATA_WIDTH-1]      m_r_data;
-logic [0:ID_WIDTH-1]       m_r_id;
+logic [0:ID_WIDTH-1]        m_r_id;
 logic                       s_aw_valid;
 logic                       s_aw_ready;
+logic [0:BURST_LEN_WIDTH-1] s_aw_len;
 logic [0:ADDR_WIDTH-1]       s_aw_addr;
 logic [0:ID_WIDTH-1]       s_aw_id;
 logic                       m_aw_valid;
 logic                       m_aw_ready;
-logic [0:ADDR_WIDTH-1]       crs_bar;
-logic [0:ADDR_WIDTH-1]       crs_limit;
+logic [0:BURST_LEN_WIDTH-1] m_aw_len;
+logic [0:ADDR_WIDTH-1]       m_aw_addr;
+logic [0:ID_WIDTH-1]       m_aw_id;
+logic [0:ADDR_WIDTH-1]      crs_bar;
+logic [0:ADDR_WIDTH-1]      crs_limit;
 logic [0:QUEUE_WIDTH]       crs_prOutstandingLimit;
-logic [0:WATCHDOG_WIDTH-1]   crs_watchdogCnt; 
+logic [0:WATCHDOG_WIDTH-1]  crs_watchdogCnt; 
 logic [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle;
 logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
@@ -74,7 +78,7 @@ logic [ID_WIDTH-1:0]    s_axi_bid;
 logic [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error can be sent
 logic                   s_axi_bvalid;
 logic                   s_axi_bready;
-logic			ddr_m_r_valid;
+
 
 logic [1:0]             s_axi_rresp;
 
@@ -106,11 +110,21 @@ prefetcherTop #(
     .s_r_last(s_r_last),
     .s_r_data(s_r_data),
     .s_r_id(s_r_id),
-    .m_r_valid(m_r_valid),
+    .m_r_valid(m_r_valid_delay),
     .m_r_ready(m_r_ready),
     .m_r_last(m_r_last),
     .m_r_data(m_r_data),
     .m_r_id(m_r_id),
+    .s_aw_valid(s_aw_valid),
+    .s_aw_ready(s_aw_ready),
+    .s_aw_len(s_aw_len),
+    .s_aw_addr(s_aw_addr),
+    .s_aw_id(s_aw_id),
+    .m_aw_valid(m_aw_valid),
+    .m_aw_ready(m_aw_ready),
+    .m_aw_len(m_aw_len),
+    .m_aw_addr(m_aw_addr),
+    .m_aw_id(m_aw_id),
     .s_aw_valid(s_aw_valid),
     .s_aw_ready(s_aw_ready),
     .s_aw_addr(s_aw_addr),
@@ -172,9 +186,25 @@ axi_ram #
     .s_axi_rdata(m_r_data),
     .s_axi_rresp(s_axi_rresp),
     .s_axi_rlast(m_r_last),
-    .s_axi_rvalid(ddr_m_r_valid),
-    .s_axi_rready(m_r_ready)
+    .s_axi_rvalid(m_r_valid),
+    .s_axi_rready(m_r_ready_delay)
 );
+
+logic m_r_valid_delay, m_r_ready_delay;
+
+axi_delay #
+(
+    .DELAY_CYCLES_WIDTH = 3
+) axi_ram_inst_delay (
+    .clk(clk),
+    .rst(rst),
+    .in_ready(m_r_ready),
+    .in_valid(m_r_valid),
+
+    .out_ready(m_r_ready_delay),
+    .out_valid(m_r_valid_delay)
+);
+
 
 assign rst = ~resetN;
 
@@ -196,16 +226,9 @@ initial begin
     #(timeout) $finish;
 end
 
-logic choose_ddr_r = 1'b1;
-
-assign m_r_valid = choose_ddr_r ? ddr_m_r_valid : 1'b0;
-
-// Tracer's vars
-int 	 fd; 			    // file descriptor handle
-int 	 trace_mem_addr;    // var for address extraction from the file
-
 initial begin
     localparam BASE_ADDR = 16'h0eef;
+    localparam REQ_NUM = 3;
     localparam RD_LEN = 0;
     localparam STRIDE = 3;
     localparam TRANS_ID = 5; 
@@ -213,14 +236,13 @@ initial begin
     resetN = 1'b0;
     en = 1'b1;
 
-    choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
 //CR Space
         // Ctrl
     crs_watchdogCnt = 10'd1000;
     crs_bar = 0;
     crs_limit = BASE_ADDR * 2;
     crs_prOutstandingLimit = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
-    crs_prBandwidthThrottle = 4;
+    crs_prBandwidthThrottle = 10;
         // Data
     crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
 
@@ -232,22 +254,17 @@ initial begin
     #clock_period;
     resetN=1'b1;
 
-    // 2. Let us now read back the data we wrote in the previous step
-    fd = $fopen ("/users/epiddo/Workshop/projectB/traces/small_test.trace", "r");
-
-    // fscanf - scan line after line in the trace's file
-    while ($fscanf (fd, "%h,", trace_mem_addr) == 1) begin
-        // Extract only the relevant address width from the trace addresses
-        s_ar_addr = trace_mem_addr[ADDR_WIDTH-1:0];
-        // Set AXI signals to commit transaction to the prefetcher
+    for (int i=0; i<REQ_NUM; i++) begin
+        //Read req of BASE_ADDR
+        s_ar_addr = BASE_ADDR + i * STRIDE;
         s_ar_len = RD_LEN;
         s_ar_id = TRANS_ID;
-        `TRANSACTION(s_ar_valid,s_ar_ready)
-    end
-	
-    // Close the file handle
-    $fclose(fd);
 
+        `TRANSACTION(s_ar_valid,s_ar_ready)
+
+        #(clock_period*6);
+    end
+      
     $finish;
 end
 
