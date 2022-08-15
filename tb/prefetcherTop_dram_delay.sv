@@ -82,6 +82,8 @@ logic                   s_axi_bready;
 
 logic [1:0]             s_axi_rresp;
 
+logic m_r_valid_delay, m_r_ready_delay;
+
 prefetcherTop #(
 .ADDR_BITS(ADDR_WIDTH),
 .LOG_QUEUE_SIZE(QUEUE_WIDTH),
@@ -190,11 +192,9 @@ axi_ram #
     .s_axi_rready(m_r_ready_delay)
 );
 
-logic m_r_valid_delay, m_r_ready_delay;
-
 axi_delay #
 (
-    .DELAY_CYCLES_WIDTH = 3
+    .DELAY_CYCLES_WIDTH(3)
 ) axi_ram_inst_delay (
     .clk(clk),
     .rst(rst),
@@ -264,7 +264,9 @@ initial begin
 
         #(clock_period*6);
     end
-      
+
+    #(clock_period*1000);
+
     $finish;
 end
 
