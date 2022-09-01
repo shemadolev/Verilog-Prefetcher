@@ -8,7 +8,7 @@ module prefetcherTop_gpgpusim_traces();
 
 localparam ADDR_SIZE_ENCODE = 4;
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
-localparam QUEUE_WIDTH = 3'd3; 
+localparam QUEUE_WIDTH = 3'd5; 
 localparam WATCHDOG_WIDTH = 10'd10; 
 localparam BURST_LEN_WIDTH = 4'd8; 
 localparam ID_WIDTH = 4'd8; 
@@ -17,7 +17,7 @@ localparam DATA_WIDTH = (1<<DATA_SIZE_ENCODE)<<3;
 localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd3; 
 localparam PIPELINE_OUTPUT = 1;
-localparam PRFETCH_FRQ_WIDTH = 3'd6;
+localparam PRFETCH_FRQ_WIDTH = 3'd1;
 
 //########### prefetcherTop ###########//
     // + axi signals (prefetcher<->DDR)
@@ -205,7 +205,7 @@ int 	 fd; 			    // file descriptor handle
 int 	 trace_mem_addr;    // var for address extraction from the file
 
 initial begin
-    localparam BASE_ADDR = 16'h0eef;
+    localparam BASE_ADDR = 16'h5940;
     localparam RD_LEN = 0;
     localparam STRIDE = 3;
     localparam TRANS_ID = 5; 
@@ -219,7 +219,7 @@ initial begin
     crs_watchdogCnt = 10'd1000;
     crs_bar = 0;
     crs_limit = BASE_ADDR * 2;
-    crs_prOutstandingLimit = {{(QUEUE_WIDTH-2){1'b0}}, 2'd3};
+    crs_prOutstandingLimit = {{(QUEUE_WIDTH-3){1'b0}}, 3'd7};
     crs_prBandwidthThrottle = 4;
         // Data
     crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
@@ -233,7 +233,7 @@ initial begin
     resetN=1'b1;
 
     // 2. Let us now read back the data we wrote in the previous step
-    fd = $fopen ("/users/epiddo/Workshop/projectB/traces/small_test.trace", "r");
+    fd = $fopen ("/users/epiddo/Workshop/projectB/traces/delay_test.trace", "r");
 
     // fscanf - scan line after line in the trace's file
     while ($fscanf (fd, "%h,", trace_mem_addr) == 1) begin
@@ -243,6 +243,7 @@ initial begin
         s_ar_len = RD_LEN;
         s_ar_id = TRANS_ID;
         `TRANSACTION(s_ar_valid,s_ar_ready)
+        #(clock_period*100);
     end
 	
     // Close the file handle
