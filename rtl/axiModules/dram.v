@@ -13,8 +13,6 @@ module dram #(
     parameter STRB_WIDTH = (DATA_WIDTH/8),
     // Width of ID signal
     parameter ID_WIDTH = 8,
-    // Number of cycles to delay 'ready' after 'valid' is up is 2^DELAY_CYCLES_WIDTH
-    parameter DELAY_CYCLES_WIDTH = 3,
     // Write data FIFO depth (cycles)
     parameter WRITE_FIFO_DEPTH = 8,
     // Read data FIFO depth (cycles)
@@ -22,8 +20,8 @@ module dram #(
     
     //Delay paramters for generating delay based on hitting same last page
     parameter PAGE_OFFSET_WIDTH = 6,
-    paremeter SHORT_DELAY_CYCLES_WIDTH = 2,
-    paremeter LONG_DELAY_CYCLES_WIDTH = 4
+    parameter SHORT_DELAY_CYCLES_WIDTH = 2,
+    parameter LONG_DELAY_CYCLES_WIDTH = 4
 ) (
     input  wire                   clk,
     input  wire                   rst,
@@ -65,8 +63,6 @@ module dram #(
     input  wire                   s_axi_rready
 );
 
-// Extra pipeline register on output
-parameter PIPELINE_OUTPUT = 0;
 // Hold write address until write data in FIFO, if possible
 parameter WRITE_FIFO_DELAY = 1;
 // Hold read address until space available in FIFO for data, if possible
@@ -224,9 +220,7 @@ axi_ram #
     // Width of address bus in bits
     .ADDR_WIDTH(ADDR_WIDTH),
     // Width of ID signal
-    .ID_WIDTH(ID_WIDTH),
-    // Extra pipeline register on output
-    .PIPELINE_OUTPUT(PIPELINE_OUTPUT)
+    .ID_WIDTH(ID_WIDTH)
 ) axi_ram_inst (
     .clk(clk),
     .rst(rst),
@@ -269,7 +263,6 @@ axi_ram #
 
 axi_delay #
 (
-    .DELAY_CYCLES_WIDTH(DELAY_CYCLES_WIDTH),
     .SHORT_DELAY_CYCLES_WIDTH(SHORT_DELAY_CYCLES_WIDTH),
     .LONG_DELAY_CYCLES_WIDTH(LONG_DELAY_CYCLES_WIDTH),
     .PAGE_OFFSET_WIDTH(PAGE_OFFSET_WIDTH)
