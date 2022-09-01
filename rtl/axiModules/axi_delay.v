@@ -11,9 +11,9 @@ module axi_delay #
 (
     // Number of cycles to delay 'ready' after 'valid' is up is 2^DELAY_CYCLES_WIDTH
         // hot page delay 
-    parameter SHORT_DELAY_CYCLES_WIDTH = 3,
+    parameter SHORT_DELAY_CYCLES_WIDTH = 2,
         // cold page delay
-    parameter LONG_DELAY_CYCLES_WIDTH = 3,
+    parameter LONG_DELAY_CYCLES_WIDTH = 4,
     parameter ADDR_WIDTH = 16,
     // Number of bits in the address that stands for the page offset in the ram
     parameter PAGE_OFFSET_WIDTH = 6

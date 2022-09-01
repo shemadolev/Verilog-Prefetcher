@@ -13,17 +13,17 @@ module dram #(
     parameter STRB_WIDTH = (DATA_WIDTH/8),
     // Width of ID signal
     parameter ID_WIDTH = 8,
-    // Extra pipeline register on output
-    parameter PIPELINE_OUTPUT = 0,
+    // Number of cycles to delay 'ready' after 'valid' is up is 2^DELAY_CYCLES_WIDTH
+    parameter DELAY_CYCLES_WIDTH = 3,
     // Write data FIFO depth (cycles)
-    parameter WRITE_FIFO_DEPTH,
+    parameter WRITE_FIFO_DEPTH = 8,
     // Read data FIFO depth (cycles)
-    parameter READ_FIFO_DEPTH,
-    // Hold write address until write data in FIFO, if possible
-    parameter WRITE_FIFO_DELAY,
-    // Hold read address until space available in FIFO for data, if possible
-    parameter READ_FIFO_DELAY
-
+    parameter READ_FIFO_DEPTH = 8,
+    
+    //Delay paramters for generating delay based on hitting same last page
+    parameter PAGE_OFFSET_WIDTH = 6,
+    paremeter SHORT_DELAY_CYCLES_WIDTH = 2,
+    paremeter LONG_DELAY_CYCLES_WIDTH = 4
 ) (
     input  wire                   clk,
     input  wire                   rst,
@@ -65,6 +65,12 @@ module dram #(
     input  wire                   s_axi_rready
 );
 
+// Extra pipeline register on output
+parameter PIPELINE_OUTPUT = 0;
+// Hold write address until write data in FIFO, if possible
+parameter WRITE_FIFO_DELAY = 1;
+// Hold read address until space available in FIFO for data, if possible
+parameter READ_FIFO_DELAY = 1;
 
 
 //########### fifo <-> dram ###########//
@@ -107,6 +113,9 @@ logic [1:0]               fd_m_rresp;
 logic                     fd_m_rlast;
 logic                     fd_m_rvalid;
 logic                     fd_m_rready;
+
+//Delayed wires for AR channel of fifo->axi_ram
+logic fd_m_arvalid_delay, fd_m_arready_delay;
 
 axi_fifo #
 (
@@ -198,7 +207,7 @@ axi_fifo #
     .m_axi_arcache(fd_m_arcache),
     .m_axi_arprot(fd_m_arprot),
     .m_axi_arvalid(fd_m_arvalid),
-    .m_axi_arready(fd_m_arready),
+    .m_axi_arready(fd_m_arready_delay),
     .m_axi_rid(fd_m_rid),
     .m_axi_rdata(fd_m_rdata),
     .m_axi_rresp(fd_m_rresp),
@@ -248,7 +257,7 @@ axi_ram #
     .s_axi_arlock(fd_m_arlock),
     .s_axi_arcache(fd_m_arcache),
     .s_axi_arprot(fd_m_arprot),
-    .s_axi_arvalid(fd_m_arvalid),
+    .s_axi_arvalid(fd_m_arvalid_delay),
     .s_axi_arready(fd_m_arready),
     .s_axi_rid(fd_m_rid),
     .s_axi_rdata(fd_m_rdata),
@@ -258,8 +267,24 @@ axi_ram #
     .s_axi_rready(fd_m_rready)
 );
 
+axi_delay #
+(
+    .DELAY_CYCLES_WIDTH(DELAY_CYCLES_WIDTH),
+    .SHORT_DELAY_CYCLES_WIDTH(SHORT_DELAY_CYCLES_WIDTH),
+    .LONG_DELAY_CYCLES_WIDTH(LONG_DELAY_CYCLES_WIDTH),
+    .PAGE_OFFSET_WIDTH(PAGE_OFFSET_WIDTH)
+) axi_ram_ar_delay (
+    .clk(clk),
+    .rst(rst),
+    .in_ready(fd_m_arready),
+    .in_valid(fd_m_arvalid),
+    .in_addr(fd_m_araddr),
 
-//todo: Add a delay to the responses, using the axi_delay module
+    .out_ready(fd_m_arready_delay),
+    .out_valid(fd_m_arvalid_delay)
+);
+
+
 
 endmodule
 
