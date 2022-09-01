@@ -141,7 +141,8 @@ prefetcherCtrl #(
     .LOG_QUEUE_SIZE(LOG_QUEUE_SIZE),
     .WATCHDOG_WIDTH(WATCHDOG_WIDTH),
     .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
-    .TID_WIDTH(TID_WIDTH)
+    .TID_WIDTH(TID_WIDTH),
+    .PRFETCH_FRQ_WIDTH(PRFETCH_FRQ_WIDTH)
 ) prCtrlPath (
     .clk(clk), 
     .en(en), 
