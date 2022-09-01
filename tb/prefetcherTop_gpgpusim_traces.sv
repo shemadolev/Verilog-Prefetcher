@@ -232,7 +232,6 @@ initial begin
     #clock_period;
     resetN=1'b1;
 
-    // 2. Let us now read back the data we wrote in the previous step
     fd = $fopen ("/users/epiddo/Workshop/projectB/traces/delay_test.trace", "r");
 
     // fscanf - scan line after line in the trace's file

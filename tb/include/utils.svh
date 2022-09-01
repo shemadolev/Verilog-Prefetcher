@@ -3,11 +3,12 @@
 `define UTILS_SVH_
 
 `define TRANSACTION(valid,ready) \
+    @(negedge clk); \
     valid = 1'b1; \
+    @(posedge clk); \
     while(~(valid & ready)) begin \
         @(posedge clk); \
     end \
-    @(posedge clk); \
     valid = 1'b0;
 
 `define tick(clk) \
