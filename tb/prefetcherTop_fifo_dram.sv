@@ -1,5 +1,5 @@
 `resetall
-`timescale 1ns / 1ps
+`timescale 1ns / 1ps //This is <time_unit>/<time_precision>. If higher freq' is needed, decrease <time_unit>
 
 `include "print.svh"
 `include "utils.svh"
@@ -20,7 +20,7 @@ localparam PRFETCH_FRQ_WIDTH = 3'd1;
 localparam FIFO_DEPTH = 5'd16;
 localparam PAGE_OFFSET_WIDTH = 8;
 localparam SHORT_DELAY_CYCLES_WIDTH = 2;
-localparam LONG_DELAY_CYCLES_WIDTH = 4;
+localparam LONG_DELAY_CYCLES_WIDTH = 5;
 
 //########### prefetcherTop ###########//
     // + axi signals (prefetcher<->DDR)
@@ -187,6 +187,7 @@ assign s_axi_bready = 1'b1;
 
 
 localparam clock_period=20;
+localparam gpu_period = clock_period * 10;
 initial begin
     clk <= '0;
     forever begin
@@ -202,13 +203,22 @@ end
 // Tracer's vars
 int 	 fd; 			    // file descriptor handle
 int 	 trace_mem_addr;    // var for address extraction from the file
+int reqs_count;
+realtime log_req []; //log of $realtime of each AR of MASTER->Prefetcher
+realtime log_res []; //log of $realtime, so the i'th element is the R response of the AR executed at log_req[i]
+realtime log_diff []; //log_res[i] - log_req[i]
+int log_req_idx, log_res_idx;
+realtime diff_sum, diff_avg;
+
+localparam file_name = "/users/epiddo/Workshop/projectB/traces/one_slice.trace";
+
+localparam use_prefetcher = 0; //1 to use prefetcher, 0 for direct GPU<->RAM
 
 initial begin
-    localparam BASE_ADDR = 16'h5940;
+    localparam BASE_ADDR = 16'h5940 * use_prefetcher;
+    localparam SLICE_RANGE = 16'h5940 * use_prefetcher;
     localparam RD_LEN = 0;
-    localparam STRIDE = 3;
-    localparam TRANS_ID = 5; 
-    localparam WR_LEN = 99;
+    localparam TRANS_ID = 5;    
     resetN = 1'b0;
     en = 1'b1;
 
@@ -216,7 +226,7 @@ initial begin
         // Ctrl
     crs_watchdogCnt = 10'd1000;
     crs_bar = 0;
-    crs_limit = BASE_ADDR * 2;
+    crs_limit = BASE_ADDR + SLICE_RANGE;
     crs_prOutstandingLimit = {{(QUEUE_WIDTH-3){1'b0}}, 3'd7};
     crs_prBandwidthThrottle = 4;
         // Data
@@ -230,9 +240,23 @@ initial begin
     #clock_period;
     resetN=1'b1;
 
-    // 2. Let us now read back the data we wrote in the previous step
-    fd = $fopen ("/users/epiddo/Workshop/projectB/traces/delay_test.trace", "r");
 
+    //Count number of lines
+    fd = $fopen (file_name, "r");
+    reqs_count = 0;
+    while ($fscanf (fd, "%h,", trace_mem_addr) == 1) begin
+        reqs_count++;
+    end
+    $fclose(fd);
+    log_req = new [reqs_count];
+    log_res = new [reqs_count];
+    log_diff = new [reqs_count];
+    log_req_idx = 0;
+    log_res_idx = 0;
+
+    $display("lines=%d",reqs_count);
+
+    fd = $fopen (file_name, "r");
     // fscanf - scan line after line in the trace's file
     while ($fscanf (fd, "%h,", trace_mem_addr) == 1) begin
         // Extract only the relevant address width from the trace addresses
@@ -241,14 +265,50 @@ initial begin
         s_ar_len = RD_LEN;
         s_ar_id = TRANS_ID;
         `TRANSACTION(s_ar_valid,s_ar_ready)
-        #(clock_period*100);    
+        #gpu_period;
     end
 	
     // Close the file handle
     $fclose(fd);
 
+    //calculate diff of res and req
+    diff_sum = 0;
+    for(int i=0;i<reqs_count;i++) begin
+        log_diff[i] = log_res[i] - log_req[i];
+        diff_sum += log_diff[i];
+    end
+    diff_avg = diff_sum / reqs_count;
+
+    //print results
+    for(int i=0;i<reqs_count;i++)
+        $display("%0.0t\t%0.0t\t%0.0t",log_req[i],log_res[i],log_diff[i]);
+
+
+    $display("diff avg = %0.0t",diff_avg);
+
     $finish;
 end
+
+//Log times of AR (read requests)
+initial begin
+    forever begin
+        @(posedge s_ar_valid);
+        log_req[log_req_idx] = $realtime;
+        log_req_idx++;
+    end
+end
+
+//Log times of R (read response)
+initial begin
+    forever begin
+        @(posedge clk);
+        if(s_r_ready & s_r_valid) begin
+            log_res[log_res_idx] = $realtime;
+            log_res_idx++;
+        end
+    end
+end
+
 
 endmodule
 `resetall
