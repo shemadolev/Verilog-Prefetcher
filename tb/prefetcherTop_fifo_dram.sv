@@ -77,7 +77,6 @@ logic [ID_WIDTH-1:0]    s_axi_bid;
 logic [1:0]             s_axi_bresp; //dram's output - always 2'b00, no error can be sent
 logic                   s_axi_bvalid;
 logic                   s_axi_bready;
-logic			        fifo_m_r_valid;
 
 logic [1:0]             s_axi_rresp;
 
@@ -174,7 +173,7 @@ dram #(
     .s_axi_rdata(m_r_data),
     .s_axi_rresp(s_axi_rresp),
     .s_axi_rlast(m_r_last),
-    .s_axi_rvalid(fifo_m_r_valid),
+    .s_axi_rvalid(m_r_valid),
     .s_axi_rready(m_r_ready)
 );
 
@@ -200,10 +199,6 @@ initial begin
     #(timeout) $finish;
 end
 
-logic choose_ddr_r = 1'b1;
-
-assign m_r_valid = choose_ddr_r ? fifo_m_r_valid : 1'b0;
-
 // Tracer's vars
 int 	 fd; 			    // file descriptor handle
 int 	 trace_mem_addr;    // var for address extraction from the file
@@ -217,7 +212,6 @@ initial begin
     resetN = 1'b0;
     en = 1'b1;
 
-    choose_ddr_r = 1'b1; //Enable DDR to pass r_valid
 //CR Space
         // Ctrl
     crs_watchdogCnt = 10'd1000;
