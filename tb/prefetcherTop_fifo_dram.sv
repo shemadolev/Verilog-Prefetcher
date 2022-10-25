@@ -1,19 +1,20 @@
 `resetall
-`timescale 1ns / 1ps //This is <time_unit>/<time_precision>. If higher freq' is needed, decrease <time_unit>
+`timescale 10ps / 1ps //This is <time_unit>/<time_precision>. If higher freq' is needed, decrease <time_unit>
 
 `include "print.svh"
 `include "utils.svh"
 
 module prefetcherTop_fifo_dram();
 
-localparam ADDR_SIZE_ENCODE = 4;
+localparam ADDR_SIZE_ENCODE = 4; // 16 bits 
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
 localparam QUEUE_WIDTH = 3'd5; 
 localparam WATCHDOG_WIDTH = 10'd10; 
 localparam BURST_LEN_WIDTH = 4'd8; 
 localparam ID_WIDTH = 4'd8; 
-localparam DATA_SIZE_ENCODE = 3'd0;
-localparam DATA_WIDTH = (1<<DATA_SIZE_ENCODE)<<3;
+localparam DATA_SIZE_ENCODE = 3'd7; // 128B
+localparam CACHELINE_SIZE = (1<<DATA_SIZE_ENCODE); // [Bytes]
+localparam DATA_WIDTH = CACHELINE_SIZE<<3;
 localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd3;
 localparam PRFETCH_FRQ_WIDTH = 3'd1;
@@ -186,8 +187,8 @@ assign s_axi_wstrb = {STRB_WIDTH{1'b1}};
 assign s_axi_bready = 1'b1;
 
 
-localparam clock_period=20;
-localparam gpu_period = clock_period * 10;
+localparam clock_period = 150; // Prefetcher freq 666Mhz => 1.5[ns]
+localparam gpu_period = clock_period / 2; //GPU freq 1.2GHz => 0.83[ns]
 initial begin
     clk <= '0;
     forever begin
@@ -195,28 +196,36 @@ initial begin
     end
 end
 
-localparam timeout=100000;
+localparam timeout=100000000;
 initial begin
     #(timeout) $finish;
 end
 
 // Tracer's vars
-int 	 fd; 			    // file descriptor handle
-int 	 trace_mem_addr;    // var for address extraction from the file
-int reqs_count;
+int 	 fd_input, fd_output; 			    // file descriptors handle
+longint  trace_mem_addr;    // var for address extraction from the file
+int      gpu_reqs_count;    // counts the reqs towards the from the GPU
+int      dram_reqs_count;   // counts the reqs towards the dram
+int      prefetcher_reqs_count;   // counts the reqs towards the prefetcher
+int      dram_total_bytes;   // counts the reqs towards the dram
 realtime log_req []; //log of $realtime of each AR of MASTER->Prefetcher
 realtime log_res []; //log of $realtime, so the i'th element is the R response of the AR executed at log_req[i]
 realtime log_diff []; //log_res[i] - log_req[i]
 int log_req_idx, log_res_idx;
-realtime diff_sum, diff_avg;
+realtime lat_sum, lat_avg;   
+int gpu_cycle_prev, gpu_cycle_cur;
+string str_temp;
 
-localparam file_name = "/users/epiddo/Workshop/projectB/traces/one_slice.trace";
+localparam file_name = "/users/epiddo/Workshop/projectB/traces/nw_256_16_1.csv";
+// localparam file_name = "/users/epiddo/Workshop/projectB/traces/one_slice.trace";
 
-localparam use_prefetcher = 0; //1 to use prefetcher, 0 for direct GPU<->RAM
+localparam use_prefetcher = 1; //1 to use prefetcher, 0 for direct GPU<->RAM
 
 initial begin
-    localparam BASE_ADDR = 16'h5940 * use_prefetcher;
-    localparam SLICE_RANGE = 16'h5940 * use_prefetcher;
+    // NOTE: need to be update according to the usecase
+    localparam BASE_ADDR = 32'hc0010540;
+    localparam LIMIT_ADDR = 32'hc0014500;
+    // static parameters
     localparam RD_LEN = 0;
     localparam TRANS_ID = 5;    
     resetN = 1'b0;
@@ -225,8 +234,8 @@ initial begin
 //CR Space
         // Ctrl
     crs_watchdogCnt = 10'd1000;
-    crs_bar = 0;
-    crs_limit = BASE_ADDR + SLICE_RANGE;
+    crs_bar = BASE_ADDR * use_prefetcher;
+    crs_limit = LIMIT_ADDR * use_prefetcher;
     crs_prOutstandingLimit = {{(QUEUE_WIDTH-3){1'b0}}, 3'd7};
     crs_prBandwidthThrottle = 4;
         // Data
@@ -236,59 +245,86 @@ initial begin
     s_axi_wvalid = 1'b0;
     s_ar_valid = 1'b0;
     s_r_ready = 1'b1;
+    s_ar_id = TRANS_ID;
+    s_ar_len = RD_LEN;
 
     #clock_period;
     resetN=1'b1;
 
 
     //Count number of lines
-    fd = $fopen (file_name, "r");
-    reqs_count = 0;
-    while ($fscanf (fd, "%h,", trace_mem_addr) == 1) begin
-        reqs_count++;
+    fd_input = $fopen (file_name, "r");
+    gpu_reqs_count = 0;
+    prefetcher_reqs_count = 0;
+    dram_reqs_count = 0;
+    while(!$feof(fd_input)) begin
+        $fgets(str_temp,fd_input);
+        gpu_reqs_count++;
     end
-    $fclose(fd);
-    log_req = new [reqs_count];
-    log_res = new [reqs_count];
-    log_diff = new [reqs_count];
+    // while ($fscanf (fd_input, "%s,%s,", str_temp,str_temp) == 1) begin
+    //     gpu_reqs_count++;
+    // end
+    $fclose(fd_input);
+    gpu_reqs_count--; //drop header line
+    log_req = new [gpu_reqs_count];
+    log_res = new [gpu_reqs_count];
+    log_diff = new [gpu_reqs_count];
     log_req_idx = 0;
     log_res_idx = 0;
 
-    $display("lines=%d",reqs_count);
+    $display("lines=%d",gpu_reqs_count);
 
-    fd = $fopen (file_name, "r");
+    fd_input = $fopen (file_name, "r");
     // fscanf - scan line after line in the trace's file
-    while ($fscanf (fd, "%h,", trace_mem_addr) == 1) begin
-        // Extract only the relevant address width from the trace addresses
-        s_ar_addr = trace_mem_addr[ADDR_WIDTH-1:0];
-        // Set AXI signals to commit transaction to the prefetcher
-        s_ar_len = RD_LEN;
-        s_ar_id = TRANS_ID;
-        `TRANSACTION(s_ar_valid,s_ar_ready)
-        #gpu_period;
+    gpu_cycle_prev = 0;
+    $fgets (str_temp,fd_input); //read header row
+
+    // $fscanf (fd_input, "%s", str_temp); //read header row
+    while ($fscanf (fd_input, "%d,%h,", gpu_cycle_cur, trace_mem_addr) > 0) begin
+        if(trace_mem_addr >= BASE_ADDR && trace_mem_addr <= LIMIT_ADDR) begin
+            // Extract only the relevant address width from the trace addresses
+            s_ar_addr = trace_mem_addr[ADDR_WIDTH-1:0];
+            //Wait GPU cycles, relative to previous transaction
+            #(gpu_period * (gpu_cycle_cur - gpu_cycle_prev));
+            `TRANSACTION(s_ar_valid,s_ar_ready)
+            prefetcher_reqs_count++;
+        end
+        gpu_cycle_prev = gpu_cycle_cur;
     end
 	
     // Close the file handle
-    $fclose(fd);
+    $fclose(fd_input);
 
     //calculate diff of res and req
-    diff_sum = 0;
-    for(int i=0;i<reqs_count;i++) begin
+    lat_sum = 0;
+    for(int i=0;i<prefetcher_reqs_count;i++) begin
         log_diff[i] = log_res[i] - log_req[i];
-        diff_sum += log_diff[i];
+        lat_sum += log_diff[i];
     end
-    diff_avg = diff_sum / reqs_count;
+    lat_avg = lat_sum / prefetcher_reqs_count;
+    
+    dram_total_bytes = dram_reqs_count * CACHELINE_SIZE;
+    //print stats results
 
-    //print results
-    for(int i=0;i<reqs_count;i++)
-        $display("%0.0t\t%0.0t\t%0.0t",log_req[i],log_res[i],log_diff[i]);
+    fd_output = $fopen("./output.csv","w");
+    $fwrite(fd_output,"request time,response time,delta\n");
 
+    for(int i=0;i<prefetcher_reqs_count;i++)
+        // $display("%0.0t\t%0.0t\t%0.0t",log_req[i],log_res[i],log_diff[i]);
+        $fwrite(fd_output,"%0.0t,%0.0t,%0.0t\n",log_req[i],log_res[i],log_diff[i]);
+    $fclose(fd_output);
 
-    $display("diff avg = %0.0t",diff_avg);
+    $display("latency avg = %0.0t",lat_avg);
+    $display("total bytes towards ddr (reqs) = %d",dram_total_bytes);
+    
+    $display("ddr bus throughput = %.2f [B/ns]",dram_total_bytes / $realtime);
+    $display("ddr bus utilization = [%d / %.2f] %.2f",dram_reqs_count,($realtime / clock_period),dram_reqs_count / ($realtime / clock_period));
 
     $finish;
 end
-
+/*
+ * GPU -> Prefetcher stats *******************
+ */
 //Log times of AR (read requests)
 initial begin
     forever begin
@@ -309,6 +345,17 @@ initial begin
     end
 end
 
+/*
+ * Prefetcher -> DDR stats *******************
+ */
+initial begin
+    forever begin
+        @(posedge clk);
+        if(m_r_valid & m_r_ready) begin
+            dram_reqs_count++;
+        end
+    end
+end
 
 endmodule
 `resetall
