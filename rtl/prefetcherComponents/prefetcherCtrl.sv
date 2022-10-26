@@ -236,9 +236,7 @@ always_comb begin
 
     m_r_ready_next = 1'b0;
 
-    //todo add timout counter for EXEC
-
-    case (st_exec_cur)
+        case (st_exec_cur)
         ST_EXEC_IDLE: begin 
 
             if((s_ar_valid & s_ar_ready) | (s_ar_valid & ~shouldCleanup & (st_pr_cur != ST_PR_CLEANUP) & ~pr_almostFull)) begin
@@ -247,14 +245,14 @@ always_comb begin
                     pr_opCode = 3'd2; //readReqManager
                     pr_m_ar_addr = s_ar_addr;
                     pr_m_ar_len = s_ar_len;
-                    s_ar_ready_next = 1'b0; // TODO stay raised, ready for next request
+                    s_ar_ready_next = 1'b0;
 
                     //Create read req' PR->DDR
                     m_ar_len_next = s_ar_len;
                     m_ar_id_next = s_ar_id;
                     m_ar_addr_next = s_ar_addr;
                     
-                    if(pr_addrHit) begin//TODO check on which clk addrHit raises
+                    if(pr_addrHit) begin
                         m_ar_valid_next = 1'b0;
                         st_exec_next = ST_EXEC_IDLE;
                     end

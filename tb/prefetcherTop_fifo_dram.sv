@@ -4,19 +4,20 @@
 `include "print.svh"
 `include "utils.svh"
 
+
 module prefetcherTop_fifo_dram();
 
 localparam ADDR_SIZE_ENCODE = 4; // 16 bits 
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
 localparam QUEUE_WIDTH = 3'd5; 
-localparam WATCHDOG_WIDTH = 10'd10; 
+localparam WATCHDOG_WIDTH = 10'd30; 
 localparam BURST_LEN_WIDTH = 4'd8; 
 localparam ID_WIDTH = 4'd8; 
 localparam DATA_SIZE_ENCODE = 3'd7; // 128B
 localparam CACHELINE_SIZE = (1<<DATA_SIZE_ENCODE); // [Bytes]
 localparam DATA_WIDTH = CACHELINE_SIZE<<3;
 localparam STRB_WIDTH = (DATA_WIDTH/8);
-localparam PROMISE_WIDTH = 3'd3;
+localparam PROMISE_WIDTH = 3'd5;
 localparam PRFETCH_FRQ_WIDTH = 3'd1;
 localparam FIFO_DEPTH = 5'd16;
 localparam PAGE_OFFSET_WIDTH = 8;
@@ -133,8 +134,7 @@ dram #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .ID_WIDTH(ID_WIDTH),
-    .WRITE_FIFO_DEPTH(FIFO_DEPTH),
-    .READ_FIFO_DEPTH(FIFO_DEPTH),
+    .FIFO_QUEUE_WIDTH(FIFO_DEPTH),
     .PAGE_OFFSET_WIDTH(PAGE_OFFSET_WIDTH),
     .SHORT_DELAY_CYCLES_WIDTH(SHORT_DELAY_CYCLES_WIDTH),
     .LONG_DELAY_CYCLES_WIDTH(LONG_DELAY_CYCLES_WIDTH)
@@ -216,18 +216,19 @@ realtime lat_sum, lat_avg;
 int gpu_cycle_prev, gpu_cycle_cur;
 string str_temp;
 
-localparam file_name = "/users/epiddo/Workshop/projectB/traces/nw_256_16_1.csv";
-// localparam file_name = "/users/epiddo/Workshop/projectB/traces/one_slice.trace";
+localparam file_name = "/users/epiddo/Workshop/projectB/traces/ispass-2009-NN.csv";
 
 localparam use_prefetcher = 1; //1 to use prefetcher, 0 for direct GPU<->RAM
 
 initial begin
     // NOTE: need to be update according to the usecase
-    localparam BASE_ADDR = 32'hc0010540;
-    localparam LIMIT_ADDR = 32'hc0014500;
+    // localparam BASE_ADDR = 32'hc0010540; //for NW
+    // localparam LIMIT_ADDR = 32'hc0014500;
+    localparam BASE_ADDR = 32'hc003e440;
+    localparam LIMIT_ADDR = 32'hc003f3a0;
     // static parameters
     localparam RD_LEN = 0;
-    localparam TRANS_ID = 5;    
+    localparam TRANS_ID = 5;
     resetN = 1'b0;
     en = 1'b1;
 
