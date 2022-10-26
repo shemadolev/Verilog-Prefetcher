@@ -71,7 +71,7 @@ logic   [0:TID_WIDTH-1] pr_m_ar_id_next;
 logic   [0:BURST_LEN_WIDTH-1] pr_len_reg, pr_len_next;
 
 // Slice's learning 
-logic   [0:ADDR_BITS-1] s_ar_addr_prev;
+logic   [0:ADDR_BITS-1] s_ar_addr_prev_reg, s_ar_addr_prev_next;
 logic   [0:ADDR_BITS-1] prefetchAddr_reg, prefetchAddr_next; //The address that should be prefetched
 
 // Control bits
@@ -116,7 +116,7 @@ always_ff @(posedge clk or negedge resetN) begin
 		st_pr_cur <= ST_PR_IDLE;
         st_exec_cur <= ST_EXEC_IDLE;
         stride_reg <= {ADDR_BITS{1'b0}};
-        s_ar_addr_prev <= {ADDR_BITS{1'b0}};
+        s_ar_addr_prev_reg <= {ADDR_BITS{1'b0}};
         pr_flush <= 1'b1;
         ToBit <= 1'b0;
         prefetchAddr_valid <= 1'b0;
@@ -135,8 +135,7 @@ always_ff @(posedge clk or negedge resetN) begin
             else if (watchdogHit && !watchdogHit_d)
                 ToBit <= ~ToBit;
             
-            if(s_ar_valid & s_ar_ready)
-                s_ar_addr_prev <= s_ar_addr;
+            s_ar_addr_prev_reg <= s_ar_addr_prev_next;
             
             st_pr_cur <= st_pr_next;
             st_exec_cur <= st_exec_next;
@@ -173,6 +172,7 @@ always_comb begin
     pr_len_next = pr_len_reg;
     pr_m_ar_id_next = pr_m_ar_id;
     prefetchAddr_next = prefetchAddr_reg;
+    s_ar_addr_prev_next = (s_ar_valid & s_ar_ready) ? s_ar_addr : s_ar_addr_prev_reg;
 
     case (st_pr_cur)
         ST_PR_IDLE: begin
@@ -319,7 +319,7 @@ always_comb begin
 end
 
 // signals assignment
-assign stride_sampled = s_ar_addr - s_ar_addr_prev;
+assign stride_sampled = s_ar_addr - s_ar_addr_prev_reg;
 assign zeroStride = (stride_sampled == {ADDR_BITS{1'b0}});
 assign prefetchAddrInRange = (prefetchAddr_reg >= crs_bar) && (prefetchAddr_reg <= crs_limit);
 assign strideMiss = s_ar_valid && stride_learned && (stride_reg != stride_sampled) && !zeroStride;
