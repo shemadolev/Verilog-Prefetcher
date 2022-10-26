@@ -5,6 +5,7 @@
 
 module prefetcherCtrl #(
     parameter ADDR_BITS = 64, //64bit address 2^64
+    parameter OFFSET_BITS = 6, //6 bits - cacheline size == 64B
     parameter LOG_QUEUE_SIZE = 3'd6, // the size of the queue [2^x] 
     parameter WATCHDOG_WIDTH = 10'd10, // number of bits for the watchdog counter
     parameter PRFETCH_FRQ_WIDTH = 3'd6,
@@ -89,6 +90,11 @@ logic s_r_valid_next;
 
 logic s_ar_ready_next;
 
+// address mask - set cacheline offset bits to 0
+localparam [0:ADDR_BITS-1] addr_mask = {{(ADDR_BITS-OFFSET_BITS){1'b1}},{OFFSET_BITS{1'b0}}};
+// mask input address
+logic [0:ADDR_BITS-1] s_ar_addr_masked;
+
 //watchdog
 logic watchdogHit;
 logic watchdogHit_d;
@@ -172,7 +178,7 @@ always_comb begin
     pr_len_next = pr_len_reg;
     pr_m_ar_id_next = pr_m_ar_id;
     prefetchAddr_next = prefetchAddr_reg;
-    s_ar_addr_prev_next = (s_ar_valid & s_ar_ready) ? s_ar_addr : s_ar_addr_prev_reg;
+    s_ar_addr_prev_next = (s_ar_valid & s_ar_ready) ? s_ar_addr_masked : s_ar_addr_prev_reg;
 
     case (st_pr_cur)
         ST_PR_IDLE: begin
@@ -189,7 +195,7 @@ always_comb begin
             else if(s_ar_valid & s_ar_ready & ~zeroStride) begin
                 st_pr_next = ST_PR_ACTIVE;
                 stride_next = stride_sampled;
-                prefetchAddr_next = s_ar_addr + stride_sampled;
+                prefetchAddr_next = s_ar_addr_masked + stride_sampled;
             end
         end 
 
@@ -243,14 +249,14 @@ always_comb begin
                 if(s_ar_valid & s_ar_ready) begin
                     //Create read req' PR.Data
                     pr_opCode = 3'd2; //readReqManager
-                    pr_m_ar_addr = s_ar_addr;
+                    pr_m_ar_addr = s_ar_addr_masked;
                     pr_m_ar_len = s_ar_len;
                     s_ar_ready_next = 1'b0;
 
                     //Create read req' PR->DDR
                     m_ar_len_next = s_ar_len;
                     m_ar_id_next = s_ar_id;
-                    m_ar_addr_next = s_ar_addr;
+                    m_ar_addr_next = s_ar_addr_masked;
                     
                     if(pr_addrHit) begin
                         m_ar_valid_next = 1'b0;
@@ -317,7 +323,7 @@ always_comb begin
 end
 
 // signals assignment
-assign stride_sampled = s_ar_addr - s_ar_addr_prev_reg;
+assign stride_sampled = s_ar_addr_masked - s_ar_addr_prev_reg;
 assign zeroStride = (stride_sampled == {ADDR_BITS{1'b0}});
 assign prefetchAddrInRange = (prefetchAddr_reg >= crs_bar) && (prefetchAddr_reg <= crs_limit);
 assign strideMiss = s_ar_valid && stride_learned && (stride_reg != stride_sampled) && !zeroStride;
@@ -328,6 +334,7 @@ assign pr_context_valid = st_pr_cur != ST_PR_IDLE;
 assign st_exec_changed = st_exec_cur != st_exec_next;
 assign pr_isCleanup = st_pr_cur == ST_PR_CLEANUP;
 assign valid_burst = ~|({{(BURST_LEN_WIDTH - LOG_QUEUE_SIZE + 1){1'b1}},{(LOG_QUEUE_SIZE - 1){1'b0}}} & s_ar_len); //Accept only burst len that will be <= 1/2 of QUEUE SIZE
+assign s_ar_addr_masked = s_ar_addr & addr_mask;
 
 endmodule
 

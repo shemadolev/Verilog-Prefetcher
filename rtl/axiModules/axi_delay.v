@@ -9,11 +9,13 @@
  */
 module axi_delay #
 (
-    // Number of cycles to delay 'ready' after 'valid' is up to 2^LONG_DELAY_CYCLES_WIDTH
+    // Number of cycles to delay 'ready' after 'valid' is up to DELAY_CYCLES
         // hot page delay 
-    parameter SHORT_DELAY_CYCLES_WIDTH = 2,
+    parameter SHORT_DELAY_CYCLES_WIDTH = 3,
+    parameter SHORT_DELAY_CYCLES = 5,
         // cold page delay
-    parameter LONG_DELAY_CYCLES_WIDTH = 4,
+    parameter LONG_DELAY_CYCLES_WIDTH = 5,
+    parameter LONG_DELAY_CYCLES = 16,
     parameter ADDR_WIDTH = 16,
     // Number of bits in the address that stands for the page offset in the ram
     parameter PAGE_OFFSET_WIDTH = 6
@@ -27,9 +29,6 @@ module axi_delay #
     output wire out_ready,
     output wire out_valid
 );
-
-parameter SHORT_COUNTDOWN_INITIAL = (1<<SHORT_DELAY_CYCLES_WIDTH) - 1;
-parameter LONG_COUNTDOWN_INITIAL = (1<<LONG_DELAY_CYCLES_WIDTH) - 1;
 
 localparam PAGE_WIDTH = ADDR_WIDTH-PAGE_OFFSET_WIDTH;
 
@@ -48,7 +47,7 @@ reg [LONG_DELAY_CYCLES_WIDTH-1:0] countdown_initial;
 // in_page_addr selects in_addr without LSB of PAGE_OFFSET_WIDTH
 assign in_page_addr = in_addr[ADDR_WIDTH-1:PAGE_OFFSET_WIDTH];
 // set the initial countdown timer depend on the address (hot/cold page)
-assign countdown_initial = (&(in_page_addr^~page_addr_reg)) ? SHORT_COUNTDOWN_INITIAL : LONG_COUNTDOWN_INITIAL;
+assign countdown_initial = (&(in_page_addr^~page_addr_reg)) ? SHORT_DELAY_CYCLES : LONG_DELAY_CYCLES;
 
 // assignment for output signals
 assign out_valid = (state_reg == STATE_ACTIVE) ? in_valid : 1'b0;

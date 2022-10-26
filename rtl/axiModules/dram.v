@@ -21,7 +21,9 @@ module dram #(
     //Delay paramters for generating delay based on hitting same last page
     parameter PAGE_OFFSET_WIDTH = 6,
     parameter SHORT_DELAY_CYCLES_WIDTH = 2,
-    parameter LONG_DELAY_CYCLES_WIDTH = 4
+    parameter SHORT_DELAY_CYCLES = 5,
+    parameter LONG_DELAY_CYCLES_WIDTH = 4,
+    parameter LONG_DELAY_CYCLES = 16
 ) (
     input  wire                   clk,
     input  wire                   rst,
@@ -150,7 +152,9 @@ axi_ram #
 axi_delay #
 (
     .SHORT_DELAY_CYCLES_WIDTH(SHORT_DELAY_CYCLES_WIDTH),
+    .SHORT_DELAY_CYCLES(SHORT_DELAY_CYCLES),
     .LONG_DELAY_CYCLES_WIDTH(LONG_DELAY_CYCLES_WIDTH),
+    .LONG_DELAY_CYCLES(LONG_DELAY_CYCLES),
     .PAGE_OFFSET_WIDTH(PAGE_OFFSET_WIDTH)
 ) axi_ram_ar_delay (
     .clk(clk),
