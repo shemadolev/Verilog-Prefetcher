@@ -206,13 +206,14 @@ int 	 fd_input, fd_output; 			    // file descriptors handle
 longint  trace_mem_addr;    // var for address extraction from the file
 int      gpu_reqs_count;    // counts the reqs towards the from the GPU
 int      dram_reqs_count;   // counts the reqs towards the dram
+int      prefetcher_resps_count;   // counts the responses of prefetcher towards the GPU
 int      prefetcher_reqs_count;   // counts the reqs towards the prefetcher
 int      dram_total_bytes;   // counts the reqs towards the dram
-realtime log_req []; //log of $realtime of each AR of MASTER->Prefetcher
-realtime log_res []; //log of $realtime, so the i'th element is the R response of the AR executed at log_req[i]
-realtime log_diff []; //log_res[i] - log_req[i]
+time log_req []; //log of $realtime of each AR of MASTER->Prefetcher
+time log_res []; //log of $realtime, so the i'th element is the R response of the AR executed at log_req[i]
+time log_diff []; //log_res[i] - log_req[i]
 int log_req_idx, log_res_idx;
-realtime lat_sum, lat_avg;   
+longint lat_sum, lat_avg;
 int gpu_cycle_prev, gpu_cycle_cur;
 string str_temp;
 
@@ -258,6 +259,7 @@ initial begin
     gpu_reqs_count = 0;
     prefetcher_reqs_count = 0;
     dram_reqs_count = 0;
+    prefetcher_resps_count = 0;
     while(!$feof(fd_input)) begin
         $fgets(str_temp,fd_input);
         gpu_reqs_count++;
@@ -293,6 +295,10 @@ initial begin
         gpu_cycle_prev = gpu_cycle_cur;
     end
 	
+    //Busy wait for all requests to be served by the prefetcher back to GPU
+    while(prefetcher_reqs_count != prefetcher_resps_count)
+        #clock_period;
+
     // Close the file handle
     $fclose(fd_input);
 
@@ -330,7 +336,7 @@ end
 initial begin
     forever begin
         @(posedge s_ar_valid);
-        log_req[log_req_idx] = $realtime;
+        log_req[log_req_idx] = $time;
         log_req_idx++;
     end
 end
@@ -340,20 +346,20 @@ initial begin
     forever begin
         @(posedge clk);
         if(s_r_ready & s_r_valid) begin
-            log_res[log_res_idx] = $realtime;
+            log_res[log_res_idx] = $time;
             log_res_idx++;
         end
     end
 end
 
-/*
- * Prefetcher -> DDR stats *******************
- */
 initial begin
     forever begin
         @(posedge clk);
         if(m_r_valid & m_r_ready) begin
             dram_reqs_count++;
+        end
+        if(s_r_valid & s_r_ready) begin
+            prefetcher_resps_count++;
         end
     end
 end
