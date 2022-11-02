@@ -294,9 +294,8 @@ initial begin
             //Wait GPU cycles, relative to previous transaction
             #(gpu_period * (gpu_cycle_cur - gpu_cycle_prev));
             `TRANSACTION(s_ar_valid,s_ar_ready)
-            prefetcher_reqs_count++;
+            gpu_cycle_prev = gpu_cycle_cur;
         end
-        gpu_cycle_prev = gpu_cycle_cur;
     end
 	
     //Busy wait for all requests to be served by the prefetcher back to GPU

@@ -14,7 +14,7 @@ module dram #(
     // Width of ID signal
     parameter ID_WIDTH = 8,
     // the size of the queue [2^x] 
-    parameter FIFO_QUEUE_WIDTH = 4'd2,
+    parameter FIFO_QUEUE_WIDTH = 4'd5,
     // AXI4 supports up to 8 bits
     parameter BURST_LEN_WIDTH = 4'd8,
     
