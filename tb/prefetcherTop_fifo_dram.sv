@@ -6,8 +6,8 @@
 
 `define USE_PREFETCHER 1 //1 to use prefetcher, 0 for direct GPU<->RAM
 `define LOG_PR_QUEUE_SIZE 5 //32 blocks
-`define LOG_BLOCK_SIZE 8 //Cacheline
-`define CRS_OUTSTAND_LIM 1 //0 = No prefetching, caching only
+`define LOG_BLOCK_SIZE 6 //Cacheline
+`define CRS_OUTSTAND_LIM 32 //0 = No prefetching, caching only
 `define CRS_BW_THROTTLE 4
 `define CRS_ALMOST_FULL 2
 
@@ -207,7 +207,7 @@ initial begin
     end
 end
 
-localparam timeout=100000000;
+localparam timeout=10000000000;
 initial begin
     #(timeout) $finish;
 end
@@ -245,7 +245,7 @@ initial begin
 
 //CR Space
         // Ctrl
-    crs_watchdogCnt = 10'd100000;
+    crs_watchdogCnt = 30'd100000;
     crs_bar = BASE_ADDR * `USE_PREFETCHER;
     crs_limit = LIMIT_ADDR * `USE_PREFETCHER;
     crs_prOutstandingLimit = `CRS_OUTSTAND_LIM;
