@@ -4,23 +4,30 @@
 `include "print.svh"
 `include "utils.svh"
 
+`define USE_PREFETCHER 1 //1 to use prefetcher, 0 for direct GPU<->RAM
+`define LOG_PR_QUEUE_SIZE 5 //32 blocks
+`define LOG_BLOCK_SIZE 8 //Cacheline
+`define CRS_OUTSTAND_LIM 1 //0 = No prefetching, caching only
+`define CRS_BW_THROTTLE 4
+`define CRS_ALMOST_FULL 2
+
 
 module prefetcherTop_fifo_dram();
 
 localparam ADDR_SIZE_ENCODE = 4; // 16 bits 
 localparam ADDR_WIDTH = 1<<ADDR_SIZE_ENCODE; 
-localparam QUEUE_WIDTH = 3'd5; 
+localparam PR_QUEUE_WIDTH = `LOG_PR_QUEUE_SIZE; 
 localparam WATCHDOG_WIDTH = 10'd30; 
 localparam BURST_LEN_WIDTH = 4'd8; 
 localparam ID_WIDTH = 4'd8; 
-localparam DATA_SIZE_ENCODE = 4'd7; // 128B
+localparam DATA_SIZE_ENCODE = `LOG_BLOCK_SIZE;
 localparam CACHELINE_SIZE = (1<<DATA_SIZE_ENCODE); // [Bytes]
 localparam DATA_WIDTH = CACHELINE_SIZE<<3;
 localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd5;
-localparam PRFETCH_FRQ_WIDTH = 3'd1;
-localparam FIFO_DEPTH = 5'd16;
-localparam PAGE_OFFSET_WIDTH = 8;
+localparam PRFETCH_FRQ_WIDTH = 3'd7;
+localparam DRAM_QUEUE_WIDTH = 4'd5; //2^5 = 32 requests
+localparam PAGE_OFFSET_WIDTH = 11; // lpddr5 - page size: 2KB
 localparam SHORT_DELAY_CYCLES_WIDTH = 7;
 localparam LONG_DELAY_CYCLES_WIDTH = 7;
 localparam SHORT_DELAY_CYCLES = 80; // 120[ns]
@@ -59,10 +66,10 @@ logic                       m_aw_valid;
 logic                       m_aw_ready;
 logic [0:ADDR_WIDTH-1]       crs_bar;
 logic [0:ADDR_WIDTH-1]       crs_limit;
-logic [0:QUEUE_WIDTH]       crs_prOutstandingLimit;
+logic [0:PR_QUEUE_WIDTH]       crs_prOutstandingLimit;
 logic [0:WATCHDOG_WIDTH-1]   crs_watchdogCnt; 
 logic [0:PRFETCH_FRQ_WIDTH-1] crs_prBandwidthThrottle;
-logic [0:QUEUE_WIDTH-1]     crs_almostFullSpacer;
+logic [0:PR_QUEUE_WIDTH-1]     crs_almostFullSpacer;
 logic [0:2]                 errorCode;
 
 //########### axi-dram ###########//
@@ -86,7 +93,7 @@ logic [1:0]             s_axi_rresp;
 
 prefetcherTop #(
     .ADDR_BITS(ADDR_WIDTH),
-    .LOG_QUEUE_SIZE(QUEUE_WIDTH),
+    .LOG_QUEUE_SIZE(PR_QUEUE_WIDTH),
     .WATCHDOG_WIDTH(WATCHDOG_WIDTH),
     .BURST_LEN_WIDTH(BURST_LEN_WIDTH),
     .TID_WIDTH(ID_WIDTH),
@@ -136,7 +143,7 @@ dram #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
     .ID_WIDTH(ID_WIDTH),
-    .FIFO_QUEUE_WIDTH(FIFO_DEPTH),
+    .FIFO_QUEUE_WIDTH(DRAM_QUEUE_WIDTH),
     .PAGE_OFFSET_WIDTH(PAGE_OFFSET_WIDTH),
     .SHORT_DELAY_CYCLES_WIDTH(SHORT_DELAY_CYCLES_WIDTH),
     .SHORT_DELAY_CYCLES(SHORT_DELAY_CYCLES),
@@ -190,7 +197,9 @@ assign s_axi_bready = 1'b1;
 
 
 localparam clock_period = 150; // Prefetcher freq 666Mhz => 1.5[ns]
-localparam gpu_period = clock_period / 2; //GPU freq 1.2GHz => 0.83[ns]
+localparam gpu_period = (clock_period / 2) * 8; //GPU freq 1.2GHz, divided to 8 banks = 153MHz => 6[ns]
+// localparam gpu_period = clock_period ; //GPU freq 666Mhz => 1.5[ns]
+// localparam gpu_period = clock_period / 2; //GPU freq 1.2GHz => 0.83[ns]
 initial begin
     clk <= '0;
     forever begin
@@ -214,15 +223,13 @@ int      dram_total_bytes;   // counts the reqs towards the dram
 time log_req []; //log of $realtime of each AR of MASTER->Prefetcher
 time log_res []; //log of $realtime, so the i'th element is the R response of the AR executed at log_req[i]
 time log_diff []; //log_res[i] - log_req[i]
-int log_req_idx, log_res_idx;
+int log_req_idx, s_ar_count;
 longint lat_sum, lat_avg;
 int gpu_cycle_prev, gpu_cycle_cur;
 string str_temp;
 
 localparam file_name = "/users/epiddo/Workshop/projectB/traces/final_traces/nw_256_16_1.csv";
 // localparam file_name = "/users/epiddo/Workshop/projectB/traces/final_traces/ispass-2009-NN.csv";
-
-localparam use_prefetcher = 1; //1 to use prefetcher, 0 for direct GPU<->RAM
 
 initial begin
     // NOTE: need to be update according to the usecase
@@ -238,13 +245,13 @@ initial begin
 
 //CR Space
         // Ctrl
-    crs_watchdogCnt = 10'd1000;
-    crs_bar = BASE_ADDR * use_prefetcher;
-    crs_limit = LIMIT_ADDR * use_prefetcher;
-    crs_prOutstandingLimit = {{(QUEUE_WIDTH-3){1'b0}}, 3'd1};
-    crs_prBandwidthThrottle = 4;
+    crs_watchdogCnt = 10'd100000;
+    crs_bar = BASE_ADDR * `USE_PREFETCHER;
+    crs_limit = LIMIT_ADDR * `USE_PREFETCHER;
+    crs_prOutstandingLimit = `CRS_OUTSTAND_LIM;
+    crs_prBandwidthThrottle = `CRS_BW_THROTTLE;
         // Data
-    crs_almostFullSpacer={{(QUEUE_WIDTH-2){1'b0}}, 2'd2};
+    crs_almostFullSpacer = `CRS_ALMOST_FULL;
 
     s_aw_valid = 1'b0;
     s_axi_wvalid = 1'b0;
@@ -264,6 +271,7 @@ initial begin
     prefetcher_reqs_count = 0;
     dram_reqs_count = 0;
     prefetcher_resps_count = 0;
+    s_ar_count = 0;
     while(!$feof(fd_input)) begin
         $fgets(str_temp,fd_input);
         gpu_reqs_count++;
@@ -276,8 +284,6 @@ initial begin
     log_req = new [gpu_reqs_count];
     log_res = new [gpu_reqs_count];
     log_diff = new [gpu_reqs_count];
-    log_req_idx = 0;
-    log_res_idx = 0;
 
     $display("lines=%d",gpu_reqs_count);
 
@@ -293,6 +299,7 @@ initial begin
             s_ar_addr = trace_mem_addr[ADDR_WIDTH-1:0];
             //Wait GPU cycles, relative to previous transaction
             #(gpu_period * (gpu_cycle_cur - gpu_cycle_prev));
+            prefetcher_reqs_count++;
             `TRANSACTION(s_ar_valid,s_ar_ready)
             gpu_cycle_prev = gpu_cycle_cur;
         end
@@ -324,11 +331,23 @@ initial begin
         $fwrite(fd_output,"%0.0t,%0.0t,%0.0t\n",log_req[i],log_res[i],log_diff[i]);
     $fclose(fd_output);
 
-    $display("latency avg = %0.0t",lat_avg);
-    $display("total bytes towards ddr (reqs) = %d",dram_total_bytes);
+    $display("##### Prefetcher Simulation Summary #####");
+
+    $display("USE_PREFETCHER\n=%d",`USE_PREFETCHER);
+    $display("LOG_PR_QUEUE_SIZE\n=%d",`LOG_PR_QUEUE_SIZE);
+    $display("LOG_BLOCK_SIZE\n=%d",`LOG_BLOCK_SIZE);
+    $display("CRS_OUTSTAND_LIM\n=%d",`CRS_OUTSTAND_LIM);
+    $display("CRS_BW_THROTTLE\n=%d",`CRS_BW_THROTTLE);
+    $display("CRS_ALMOST_FULL\n=%d",`CRS_ALMOST_FULL);
+
+    $display("latency avg\n=%0.0t",lat_avg);
+    $display("total bytes towards ddr (reqs)\n=%d",dram_total_bytes);
     
-    $display("ddr bus throughput = %.2f [B/ns]",dram_total_bytes / $realtime);
-    $display("ddr bus utilization = [%d / %.2f] %.2f",dram_reqs_count,($realtime / clock_period),dram_reqs_count / ($realtime / clock_period));
+    $display("ddr bus throughput [B/ns]\n=%.5f",dram_total_bytes / $realtime);
+    $display("ddr bus utilization [%d/%.2f]\n=%.5f",dram_reqs_count,($realtime / clock_period),dram_reqs_count / ($realtime / clock_period));
+    
+    $display("Total simulation time\n=%0.0t",$realtime);
+    $display("Slice range reqs count\n=%d",prefetcher_reqs_count);
 
     $finish;
 end
@@ -348,21 +367,15 @@ end
 initial begin
     forever begin
         @(posedge clk);
-        if(s_r_ready & s_r_valid) begin
-            log_res[log_res_idx] = $time;
-            log_res_idx++;
+        if(s_r_ready & s_r_valid & s_r_last) begin
+            log_res[prefetcher_resps_count] = $time;
+            prefetcher_resps_count++;
         end
-    end
-end
-
-initial begin
-    forever begin
-        @(posedge clk);
         if(m_r_valid & m_r_ready) begin
             dram_reqs_count++;
         end
-        if(s_r_valid & s_r_ready) begin
-            prefetcher_resps_count++;
+        if(s_ar_ready & s_ar_valid) begin
+            s_ar_count++;
         end
     end
 end
