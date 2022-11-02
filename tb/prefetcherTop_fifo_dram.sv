@@ -5,11 +5,13 @@
 `include "utils.svh"
 
 `define USE_PREFETCHER 1 //1 to use prefetcher, 0 for direct GPU<->RAM
-`define LOG_PR_QUEUE_SIZE 5 //32 blocks
-`define LOG_BLOCK_SIZE 6 //Cacheline
+`define LOG_PR_QUEUE_SIZE 6 //32 blocks
+`define LOG_BLOCK_SIZE 5 //Cacheline
 `define CRS_OUTSTAND_LIM 32 //0 = No prefetching, caching only
-`define CRS_BW_THROTTLE 4
+`define CRS_BW_THROTTLE 1
 `define CRS_ALMOST_FULL 2
+// `define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/nw_256_16_1.csv"
+`define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/ispass-2009-NN.csv"
 
 
 module prefetcherTop_fifo_dram();
@@ -197,6 +199,7 @@ assign s_axi_bready = 1'b1;
 
 
 localparam clock_period = 150; // Prefetcher freq 666Mhz => 1.5[ns]
+// localparam gpu_period = (clock_period / 2) * 4; //GPU freq 1.2GHz, divided to 4 banks ~ 300MHz => 6[ns]
 localparam gpu_period = (clock_period / 2) * 8; //GPU freq 1.2GHz, divided to 8 banks = 153MHz => 6[ns]
 // localparam gpu_period = clock_period ; //GPU freq 666Mhz => 1.5[ns]
 // localparam gpu_period = clock_period / 2; //GPU freq 1.2GHz => 0.83[ns]
@@ -228,15 +231,12 @@ longint lat_sum, lat_avg;
 int gpu_cycle_prev, gpu_cycle_cur;
 string str_temp;
 
-localparam file_name = "/users/epiddo/Workshop/projectB/traces/final_traces/nw_256_16_1.csv";
-// localparam file_name = "/users/epiddo/Workshop/projectB/traces/final_traces/ispass-2009-NN.csv";
-
 initial begin
     // NOTE: need to be update according to the usecase
-    localparam BASE_ADDR = 32'hc0010540; //for NW
-    localparam LIMIT_ADDR = 32'hc0014500;
-    // localparam BASE_ADDR = 32'hc003e440;//fow NN
-    // localparam LIMIT_ADDR = 32'hc003f3a0;
+    // localparam BASE_ADDR = 32'hc0010540; //for NW
+    // localparam LIMIT_ADDR = 32'hc0014500;
+    localparam BASE_ADDR = 32'hc003e440;//fow NN
+    localparam LIMIT_ADDR = 32'hc003f3a0;
     // static parameters
     localparam RD_LEN = 0;
     localparam TRANS_ID = 5;
@@ -265,7 +265,7 @@ initial begin
 
 
     //Count number of lines
-    fd_input = $fopen (file_name, "r");
+    fd_input = $fopen (`TRACES_FILENAME, "r");
     assert (fd_input != 0); //File opened successfully
     gpu_reqs_count = 0;
     prefetcher_reqs_count = 0;
@@ -287,7 +287,7 @@ initial begin
 
     $display("lines=%d",gpu_reqs_count);
 
-    fd_input = $fopen (file_name, "r");
+    fd_input = $fopen (`TRACES_FILENAME, "r");
     // fscanf - scan line after line in the trace's file
     gpu_cycle_prev = 0;
     $fgets (str_temp,fd_input); //read header row
