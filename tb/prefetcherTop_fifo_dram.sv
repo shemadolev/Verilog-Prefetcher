@@ -4,14 +4,14 @@
 `include "print.svh"
 `include "utils.svh"
 
-`define USE_PREFETCHER 1 //1 to use prefetcher, 0 for direct GPU<->RAM
-`define LOG_PR_QUEUE_SIZE 6 //32 blocks
-`define LOG_BLOCK_SIZE 5 //Cacheline
-`define CRS_OUTSTAND_LIM 32 //0 = No prefetching, caching only
+`define USE_PREFETCHER 0 //1 to use prefetcher, 0 for direct GPU<->RAM
+`define LOG_PR_QUEUE_SIZE 5 //32 blocks
+`define LOG_BLOCK_SIZE 8 //Cacheline
+`define CRS_OUTSTAND_LIM 1 //0 = No prefetching, caching only
 `define CRS_BW_THROTTLE 1
 `define CRS_ALMOST_FULL 2
-// `define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/nw_256_16_1.csv"
-`define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/ispass-2009-NN.csv"
+`define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/nw_256_16_1.csv"
+// `define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/ispass-2009-NN.csv"
 
 
 module prefetcherTop_fifo_dram();
@@ -233,10 +233,10 @@ string str_temp;
 
 initial begin
     // NOTE: need to be update according to the usecase
-    // localparam BASE_ADDR = 32'hc0010540; //for NW
-    // localparam LIMIT_ADDR = 32'hc0014500;
-    localparam BASE_ADDR = 32'hc003e440;//fow NN
-    localparam LIMIT_ADDR = 32'hc003f3a0;
+    localparam BASE_ADDR = 32'hc0010540; //for NW
+    localparam LIMIT_ADDR = 32'hc0014500;
+    // localparam BASE_ADDR = 32'hc003e440;//fow NN
+    // localparam LIMIT_ADDR = 32'hc003f3a0;
     // static parameters
     localparam RD_LEN = 0;
     localparam TRANS_ID = 5;
@@ -276,9 +276,7 @@ initial begin
         $fgets(str_temp,fd_input);
         gpu_reqs_count++;
     end
-    // while ($fscanf (fd_input, "%s,%s,", str_temp,str_temp) == 1) begin
-    //     gpu_reqs_count++;
-    // end
+
     $fclose(fd_input);
     gpu_reqs_count--; //drop header line
     log_req = new [gpu_reqs_count];
@@ -298,7 +296,7 @@ initial begin
             // Extract only the relevant address width from the trace addresses
             s_ar_addr = trace_mem_addr[ADDR_WIDTH-1:0];
             //Wait GPU cycles, relative to previous transaction
-            #(gpu_period * (gpu_cycle_cur - gpu_cycle_prev));
+            #(gpu_cycle_prev == 0 ? 0 : gpu_period * (gpu_cycle_cur - gpu_cycle_prev)); //wait the diff of cycles, unless this is the first transaction
             prefetcher_reqs_count++;
             `TRANSACTION(s_ar_valid,s_ar_ready)
             gpu_cycle_prev = gpu_cycle_cur;
