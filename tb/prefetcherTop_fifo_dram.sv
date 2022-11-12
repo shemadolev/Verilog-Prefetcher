@@ -4,11 +4,11 @@
 `include "print.svh"
 `include "utils.svh"
 
-`define USE_PREFETCHER 0 //1 to use prefetcher, 0 for direct GPU<->RAM
+`define USE_PREFETCHER 1 //1 to use prefetcher, 0 for direct GPU<->RAM
 `define LOG_PR_QUEUE_SIZE 5 //32 blocks
 `define LOG_BLOCK_SIZE 8 //Cacheline
-`define CRS_OUTSTAND_LIM 1 //0 = No prefetching, caching only
-`define CRS_BW_THROTTLE 1
+`define CRS_OUTSTAND_LIM 32 //0 = No prefetching, caching only
+`define CRS_BW_THROTTLE 750
 `define CRS_ALMOST_FULL 2
 `define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/nw_256_16_1.csv"
 // `define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/ispass-2009-NN.csv"
@@ -27,7 +27,7 @@ localparam CACHELINE_SIZE = (1<<DATA_SIZE_ENCODE); // [Bytes]
 localparam DATA_WIDTH = CACHELINE_SIZE<<3;
 localparam STRB_WIDTH = (DATA_WIDTH/8);
 localparam PROMISE_WIDTH = 3'd5;
-localparam PRFETCH_FRQ_WIDTH = 3'd7;
+localparam PRFETCH_FRQ_WIDTH = 10'd20;
 localparam DRAM_QUEUE_WIDTH = 4'd5; //2^5 = 32 requests
 localparam PAGE_OFFSET_WIDTH = 11; // lpddr5 - page size: 2KB
 localparam SHORT_DELAY_CYCLES_WIDTH = 7;
