@@ -8,7 +8,7 @@
 `define LOG_PR_QUEUE_SIZE 5 //32 blocks
 `define LOG_BLOCK_SIZE 7 //Cacheline
 `define CRS_OUTSTAND_LIM 32 //0 = No prefetching, caching only
-`define CRS_BW_THROTTLE 3000
+`define CRS_BW_THROTTLE 1400
 `define CRS_ALMOST_FULL 2
 `define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/nw_256_16_1.csv"
 // `define TRACES_FILENAME "/users/epiddo/Workshop/projectB/traces/final_traces/ispass-2009-NN.csv"
